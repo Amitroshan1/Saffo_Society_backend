@@ -29,6 +29,17 @@ async def guard_notifications(
     return success_response(200, "Guard notifications fetched", data)
 
 
+@router.post("/guard/notifications/mark-all-read")
+async def guard_mark_all_read(
+    db: AsyncSession = Depends(get_db),
+    current: CurrentUser = Depends(require_roles("guard")),
+):
+    data = await guard_notification_service.mark_all_notifications_read(
+        db, actor_id=current.user_id, actor_society_id=current.society_id
+    )
+    return success_response(200, "All notifications marked as read", data)
+
+
 @router.post("/guard/notifications/{notification_id}/read")
 async def guard_mark_read(
     notification_id: UUID,

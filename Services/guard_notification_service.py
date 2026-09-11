@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Any, Dict
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from Events.bus import publish_simple
+from Models.notification import Notification
 from Schemas.notification import NotificationListQueryParams
 from Services import notification_service
 from Services.notification_helpers import (
@@ -56,3 +58,27 @@ async def mark_notification_read(
         payload={},
     )
     return {"notification": notification_to_dict(notification)}
+
+
+async def mark_all_notifications_read(
+    db: AsyncSession, *, actor_id: UUID, actor_society_id: UUID | None
+) -> Dict[str, Any]:
+    """Mark every unread notification for this guard as read."""
+    society_id = require_society_id(actor_society_id)
+    now = utcnow()
+    rows = (
+        await db.execute(
+            select(Notification).where(
+                Notification.society_id == society_id,
+                Notification.user_id == actor_id,
+                Notification.read_at.is_(None),
+                Notification.is_active.is_(True),
+            )
+        )
+    ).scalars().all()
+    for notification in rows:
+        notification.read_at = now
+        notification.status = "read"
+        apply_update_audit(notification, actor_id)
+    await db.commit()
+    return {"updatedCount": len(rows)}
