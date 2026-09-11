@@ -1,0 +1,33 @@
+from Routers import (
+    attendance,
+    auth,
+    building,
+    flat,
+    gate,
+    occupancy,
+    profile,
+    resident,
+    shift,
+    society,
+    staff,
+    visit,
+    visitor,
+    wing,
+)
+
+__all__ = [
+    "attendance",
+    "auth",
+    "building",
+    "flat",
+    "gate",
+    "occupancy",
+    "profile",
+    "resident",
+    "shift",
+    "society",
+    "staff",
+    "visit",
+    "visitor",
+    "wing",
+]

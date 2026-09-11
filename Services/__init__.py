@@ -1,0 +1,33 @@
+from Services import (
+    attendance_service,
+    auth_service,
+    building_service,
+    flat_service,
+    gate_service,
+    occupancy_service,
+    profile_service,
+    resident_service,
+    shift_service,
+    society_service,
+    staff_service,
+    visit_service,
+    visitor_service,
+    wing_service,
+)
+
+__all__ = [
+    "attendance_service",
+    "auth_service",
+    "building_service",
+    "flat_service",
+    "gate_service",
+    "occupancy_service",
+    "profile_service",
+    "resident_service",
+    "shift_service",
+    "society_service",
+    "staff_service",
+    "visit_service",
+    "visitor_service",
+    "wing_service",
+]
