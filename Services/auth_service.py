@@ -25,9 +25,9 @@ from Schemas.auth import AuthUserPayload
 from Utils.errors import ApiError
 from Utils.logger import logger
 
-# user_id -> (token_hash, expires_epoch) — allows one concurrent refresh race
+# user_id -> (token_hash, expires_epoch) — concurrent refresh / Strict Mode race
 _PREVIOUS_REFRESH: Dict[UUID, Tuple[str, float]] = {}
-_REFRESH_GRACE_SECONDS = 45.0
+_REFRESH_GRACE_SECONDS = 90.0
 
 
 def user_payload(user: User) -> Dict[str, Any]:
@@ -177,7 +177,12 @@ async def login(
 
 async def refresh_tokens(
     db: AsyncSession, token: Optional[str]
-) -> Tuple[Dict[str, Any], str]:
+) -> Tuple[Dict[str, Any], Optional[str]]:
+    """Rotate access (+ refresh) using the HttpOnly refresh cookie.
+
+    Returns ``(payload, new_refresh_or_none)``. When ``new_refresh`` is ``None``,
+    a concurrent caller already rotated — mint access only and leave the cookie.
+    """
     if not token:
         raise ApiError(401, "No refresh token")
 
@@ -193,22 +198,26 @@ async def refresh_tokens(
     if not user or not user.is_active:
         raise ApiError(401, "Invalid or expired refresh token")
 
-    # Accept current hash, or a just-rotated previous hash (concurrent refresh race /
+    now = datetime.now(timezone.utc).timestamp()
+    # Accept current hash, or a just-rotated previous hash (concurrent refresh /
     # React Strict Mode double-mount) within a short grace window.
-    previous = _PREVIOUS_REFRESH.pop(user_id, None)
+    previous = _PREVIOUS_REFRESH.get(user_id)
     previous_ok = bool(
-        previous
-        and previous[0] == hashed
-        and previous[1] > datetime.now(timezone.utc).timestamp()
+        previous and previous[0] == hashed and previous[1] > now
     )
     if user.refresh_token != hashed and not previous_ok:
         raise ApiError(401, "Invalid or expired refresh token")
 
-    if user.refresh_token and user.refresh_token == hashed:
-        _PREVIOUS_REFRESH[user_id] = (
-            user.refresh_token,
-            datetime.now(timezone.utc).timestamp() + _REFRESH_GRACE_SECONDS,
+    # Sibling request already rotated — issue access only; do not rotate again
+    # (avoids invalidating the cookie the first response just set).
+    if previous_ok and user.refresh_token != hashed:
+        new_access = sign_access_token(user.id, user.role)
+        return (
+            {"accessToken": new_access, "user": user_payload(user)},
+            None,
         )
+
+    _PREVIOUS_REFRESH[user_id] = (hashed, now + _REFRESH_GRACE_SECONDS)
 
     new_access = sign_access_token(user.id, user.role)
     new_refresh = sign_refresh_token(user.id)

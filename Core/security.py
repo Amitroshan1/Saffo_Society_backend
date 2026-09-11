@@ -92,13 +92,19 @@ def verify_refresh_token(token: str) -> Dict[str, Any]:
 
 
 def cookie_options() -> Dict[str, Any]:
-    """Refresh cookie for SPA on another localhost port (cross-origin, same-site)."""
+    """Refresh cookie for the SPA talking to the API on another origin/port.
+
+    Vite (`localhost:5173`) → API (`localhost:5000`) is cross-origin. Browsers omit
+    `SameSite=Lax` cookies on cross-site XHR/fetch, so page reload / access-token
+    expiry cannot refresh the session. `SameSite=None; Secure` is required for
+    credentialed cross-origin requests. Chrome/Edge/Firefox allow `Secure`
+    cookies on `http://localhost` and `http://127.0.0.1` without HTTPS.
+    """
     return {
         "key": "refreshToken",
         "httponly": True,
-        "secure": settings.is_production,
-        # Lax works for credentialed XHR between localhost:5173 ↔ localhost:5000
-        "samesite": "lax",
+        "secure": True,
+        "samesite": "none",
         "max_age": settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         "path": "/",
     }

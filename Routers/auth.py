@@ -36,13 +36,23 @@ def _set_refresh_cookie(response: JSONResponse, token: str) -> None:
 
 def _clear_refresh_cookie(response: JSONResponse) -> None:
     opts = cookie_options()
-    response.delete_cookie(
-        key=opts["key"],
-        path=opts["path"],
-        httponly=opts["httponly"],
-        secure=opts["secure"],
-        samesite=opts["samesite"],
-    )
+    # Clear current + legacy variants (old path / SameSite=Lax / non-Secure).
+    paths = {opts["path"], "/", "/api"}
+    variants = {
+        (opts["secure"], opts["samesite"]),
+        (False, "lax"),
+        (True, "none"),
+        (False, "none"),
+    }
+    for path in paths:
+        for secure, samesite in variants:
+            response.delete_cookie(
+                key=opts["key"],
+                path=path,
+                httponly=opts["httponly"],
+                secure=secure,
+                samesite=samesite,
+            )
 
 
 @router.post("/register")
@@ -81,6 +91,8 @@ async def login(
         status_code=200,
         content={"success": True, "message": "Login successful", "data": data},
     )
+    # Drop legacy Lax /api cookies so they cannot override the new Secure cookie.
+    _clear_refresh_cookie(response)
     _set_refresh_cookie(response, refresh_token)
     return response
 
@@ -93,7 +105,9 @@ async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
         status_code=200,
         content={"success": True, "message": "Token refreshed", "data": data},
     )
-    _set_refresh_cookie(response, new_refresh)
+    # None => concurrent refresh already rotated; keep existing cookie.
+    if new_refresh:
+        _set_refresh_cookie(response, new_refresh)
     return response
 
 
