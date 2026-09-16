@@ -6,9 +6,10 @@ from pydantic import ValidationError
 from Schemas.auth import LoginRequest, RegisterRequest
 
 
-def test_login_requires_role():
-    with pytest.raises(ValidationError):
-        LoginRequest(email="a@b.com", password="Secret1!")
+def test_login_email_password_only():
+    body = LoginRequest(email="a@b.com", password="Secret1!")
+    assert body.email == "a@b.com"
+    assert body.password == "Secret1!"
 
 
 def test_register_password_strength():

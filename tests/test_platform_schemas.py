@@ -26,13 +26,12 @@ def test_register_rejects_platform_role():
         )
 
 
-def test_login_allows_super_admin_role():
+def test_login_accepts_credentials_without_role():
     body = LoginRequest(
         email="superadmin@platform.com",
         password="Admin@123",
-        role=UserRole.SUPER_ADMIN,
     )
-    assert body.role == UserRole.SUPER_ADMIN
+    assert str(body.email) == "superadmin@platform.com"
 
 
 def test_tenant_create_schema():

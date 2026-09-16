@@ -127,18 +127,12 @@ async def login(
     *,
     email: str,
     password: str,
-    role: str,
 ) -> Tuple[Dict[str, Any], str]:
     email_norm = email.lower().strip()
     result = await db.execute(select(User).where(User.email == email_norm))
     user = result.scalar_one_or_none()
     if not user:
         raise ApiError(401, "Invalid credentials")
-    if user.role != role:
-        raise ApiError(
-            403,
-            f"This account belongs to the {user.role} panel, not {role}",
-        )
 
     if user.is_locked():
         lock = user.lock_until

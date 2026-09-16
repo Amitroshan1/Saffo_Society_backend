@@ -85,7 +85,6 @@ async def login(
         db,
         email=str(body.email),
         password=body.password,
-        role=body.role.value,
     )
     response = JSONResponse(
         status_code=200,

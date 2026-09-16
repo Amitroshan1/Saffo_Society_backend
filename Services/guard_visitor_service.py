@@ -141,6 +141,8 @@ def _serialize(
         "preApproved": visit.is_preapproved,
         "remarks": visit.notes,
         "residentName": resident_name,
+        "createdAt": visit.created_at.isoformat() if visit.created_at else None,
+        "checkInTime": visit.check_in_time.isoformat() if visit.check_in_time else None,
     }
 
 

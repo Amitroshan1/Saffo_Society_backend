@@ -105,7 +105,6 @@ class RegisterPublicRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1)
-    role: UserRole
 
 
 class ForgotPasswordRequest(BaseModel):
