@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from Database.session import get_db
@@ -16,6 +16,18 @@ from Services import guard_facility_service
 from Utils.responses import success_response
 
 router = APIRouter(prefix="/api/v1", tags=["guard-facilities"])
+
+
+@router.get("/guard/bookings")
+async def guard_list_bookings(
+    query: GuardBookingListQueryParams = Depends(get_guard_booking_list_query),
+    db: AsyncSession = Depends(get_db),
+    current: CurrentUser = Depends(require_roles("guard")),
+):
+    data = await guard_facility_service.list_bookings(
+        db, query, actor_society_id=current.society_id
+    )
+    return success_response(200, "Bookings fetched", data)
 
 
 @router.get("/guard/bookings/today")
@@ -33,12 +45,17 @@ async def guard_today_bookings(
 @router.post("/guard/bookings/{booking_id}/checkin")
 async def guard_checkin_booking(
     booking_id: UUID,
-    body: BookingCheckinRequest,
     db: AsyncSession = Depends(get_db),
     current: CurrentUser = Depends(require_roles("guard")),
+    body: BookingCheckinRequest | None = Body(default=None),
 ):
+    # Guard UI may POST with no body; treat missing body as empty payload.
     data = await guard_facility_service.checkin_booking(
-        db, booking_id, body, actor_id=current.user_id, actor_society_id=current.society_id
+        db,
+        booking_id,
+        body or BookingCheckinRequest(),
+        actor_id=current.user_id,
+        actor_society_id=current.society_id,
     )
     return success_response(200, "Booking checked in", data)
 
@@ -46,11 +63,15 @@ async def guard_checkin_booking(
 @router.post("/guard/bookings/{booking_id}/checkout")
 async def guard_checkout_booking(
     booking_id: UUID,
-    body: BookingCheckoutRequest,
     db: AsyncSession = Depends(get_db),
     current: CurrentUser = Depends(require_roles("guard")),
+    body: BookingCheckoutRequest | None = Body(default=None),
 ):
     data = await guard_facility_service.checkout_booking(
-        db, booking_id, body, actor_id=current.user_id, actor_society_id=current.society_id
+        db,
+        booking_id,
+        body or BookingCheckoutRequest(),
+        actor_id=current.user_id,
+        actor_society_id=current.society_id,
     )
     return success_response(200, "Booking checked out", data)

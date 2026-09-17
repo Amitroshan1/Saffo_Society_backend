@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,6 +34,9 @@ class Gate(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     gate_type: Mapped[str] = mapped_column(String(32), nullable=False)
     location_description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    geofence_radius_meters: Mapped[int] = mapped_column(Integer, nullable=False, default=120)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

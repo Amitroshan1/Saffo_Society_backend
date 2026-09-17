@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from Schemas.common import ListQueryParams
 
@@ -174,21 +174,39 @@ class AttendanceCheckIn(BaseModel):
     gateId: Optional[UUID] = None
     checkInTime: Optional[datetime] = None
     notes: Optional[str] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    accuracyMeters: Optional[float] = Field(None, ge=0, le=10000)
 
     @field_validator("notes")
     @classmethod
     def strip_notes(cls, value: Optional[str]) -> Optional[str]:
         return _normalize_optional_str(value)
+
+    @model_validator(mode="after")
+    def validate_coordinates_pair(self) -> "AttendanceCheckIn":
+        if (self.latitude is None) ^ (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together")
+        return self
 
 
 class AttendanceCheckOut(BaseModel):
     checkOutTime: Optional[datetime] = None
     notes: Optional[str] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    accuracyMeters: Optional[float] = Field(None, ge=0, le=10000)
 
     @field_validator("notes")
     @classmethod
     def strip_notes(cls, value: Optional[str]) -> Optional[str]:
         return _normalize_optional_str(value)
+
+    @model_validator(mode="after")
+    def validate_coordinates_pair(self) -> "AttendanceCheckOut":
+        if (self.latitude is None) ^ (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together")
+        return self
 
 
 class AttendanceOut(BaseModel):

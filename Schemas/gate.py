@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from Schemas.common import ListQueryParams
 
@@ -41,6 +41,9 @@ class GateCreate(BaseModel):
     gateType: str = Field(..., max_length=32)
     buildingId: Optional[UUID] = None
     locationDescription: Optional[str] = Field(None, max_length=500)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    geofenceRadiusMeters: Optional[int] = Field(None, ge=10, le=5000)
     sequence: int = Field(default=0, ge=0, le=9999)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     notes: Optional[str] = None
@@ -74,6 +77,12 @@ class GateCreate(BaseModel):
     def strip_nullable(cls, value: Optional[str]) -> Optional[str]:
         return _normalize_optional_str(value)
 
+    @model_validator(mode="after")
+    def validate_coordinates_pair(self) -> "GateCreate":
+        if (self.latitude is None) ^ (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together")
+        return self
+
 
 class GateUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -82,6 +91,9 @@ class GateUpdate(BaseModel):
     gateType: Optional[str] = Field(None, max_length=32)
     buildingId: Optional[UUID] = None
     locationDescription: Optional[str] = Field(None, max_length=500)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    geofenceRadiusMeters: Optional[int] = Field(None, ge=10, le=5000)
     sequence: Optional[int] = Field(None, ge=0, le=9999)
     metadata: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
@@ -101,6 +113,15 @@ class GateUpdate(BaseModel):
             raise ValueError(f"gateType must be one of: {', '.join(GATE_TYPE_VALUES)}")
         return value
 
+    @model_validator(mode="after")
+    def validate_coordinates_pair(self) -> "GateUpdate":
+        provided = self.model_fields_set
+        if ("latitude" in provided) ^ ("longitude" in provided):
+            raise ValueError("latitude and longitude must be provided together")
+        if "latitude" in provided and "longitude" in provided:
+            if (self.latitude is None) ^ (self.longitude is None):
+                raise ValueError("latitude and longitude must both be set or both cleared")
+        return self
 
 class GateOut(BaseModel):
     id: UUID
@@ -111,6 +132,9 @@ class GateOut(BaseModel):
     name: str
     gateType: str
     locationDescription: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    geofenceRadiusMeters: int = 120
     sequence: int
     metadata: Dict[str, Any]
     notes: Optional[str] = None
@@ -133,6 +157,9 @@ class GateOut(BaseModel):
             name=gate.name,
             gateType=gate.gate_type,
             locationDescription=gate.location_description,
+            latitude=gate.latitude,
+            longitude=gate.longitude,
+            geofenceRadiusMeters=getattr(gate, "geofence_radius_meters", None) or 120,
             sequence=gate.sequence,
             metadata=gate.metadata_json or {},
             notes=gate.notes,
