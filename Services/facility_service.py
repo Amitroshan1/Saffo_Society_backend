@@ -13,7 +13,6 @@ from Events.bus import publish_simple
 from Models.facility import (
     Facility,
     FacilityBooking,
-    FacilityBookingSlot,
     FacilityMaintenanceBlock,
 )
 from Models.resident import Resident
@@ -37,15 +36,16 @@ from Services.facility_helpers import (
     booking_to_dict,
     check_resident_booking_limit,
     check_slot_availability,
+    count_overlapping_bookings,
     generate_booking_code,
+    generate_time_windows,
+    generated_slot_to_dict,
     get_facility_in_society,
     get_booking_in_society,
     is_within_cancellation_window,
     maintenance_block_to_dict,
-    minutes_to_time,
     next_booking_number,
     require_society_id,
-    slot_to_dict,
     slugify,
     time_to_minutes,
 )
@@ -272,6 +272,7 @@ async def create_booking_slots(
     actor_id: UUID,
     actor_society_id: UUID | None,
 ) -> Dict[str, Any]:
+    """Kept for the admin Generate slots UI. Windows are derived from amenity hours, not stored."""
     society_id = require_society_id(actor_society_id)
     amenity = await get_facility_in_society(db, facility_id, society_id)
     if not amenity.operating_hours_start or not amenity.operating_hours_end:
@@ -283,45 +284,12 @@ async def create_booking_slots(
     if duration <= 0 or start_minutes >= end_minutes:
         raise ApiError(422, "Facility operating hours/slot duration are misconfigured")
 
-    existing_rows = (
-        await db.execute(
-            select(FacilityBookingSlot.date, FacilityBookingSlot.start_time).where(
-                FacilityBookingSlot.amenity_id == amenity.id,
-                FacilityBookingSlot.date >= body.startDate,
-                FacilityBookingSlot.date <= body.endDate,
-            )
-        )
-    ).all()
-    existing_keys = {(d, s) for d, s in existing_rows}
-
     created = 0
     current_date = body.startDate
     while current_date <= body.endDate:
-        weekday = str(current_date.weekday())
-        if not amenity.available_days or weekday in amenity.available_days:
-            t = start_minutes
-            while t + duration <= end_minutes:
-                start_str = minutes_to_time(t)
-                end_str = minutes_to_time(t + duration)
-                if (current_date, start_str) not in existing_keys:
-                    db.add(
-                        FacilityBookingSlot(
-                            amenity_id=amenity.id,
-                            society_id=society_id,
-                            date=current_date,
-                            start_time=start_str,
-                            end_time=end_str,
-                            capacity=amenity.capacity,
-                            booked_count=0,
-                            is_blocked=False,
-                            metadata_json={},
-                        )
-                    )
-                    created += 1
-                t += duration
+        created += len(generate_time_windows(amenity, current_date))
         current_date += timedelta(days=1)
 
-    await db.commit()
     return {
         "amenityId": str(amenity.id),
         "startDate": body.startDate.isoformat(),
@@ -503,7 +471,6 @@ async def reject_booking(
     booking.status = "rejected"
     booking.rejected_reason = body.reason
     apply_update_audit(booking, actor_id)
-    await _release_slot(db, booking)
     await db.commit()
 
     publish_simple(
@@ -515,16 +482,6 @@ async def reject_booking(
         payload={"bookingId": str(booking.id), "reason": body.reason},
     )
     return await get_booking(db, booking.id, actor_society_id=society_id)
-
-
-async def _release_slot(db: AsyncSession, booking: FacilityBooking) -> None:
-    if not booking.slot_id:
-        return
-    slot = (
-        await db.execute(select(FacilityBookingSlot).where(FacilityBookingSlot.id == booking.slot_id))
-    ).scalar_one_or_none()
-    if slot and slot.booked_count and slot.booked_count > 0:
-        slot.booked_count -= 1
 
 
 # ---------------------------------------------------------------------------
@@ -575,13 +532,6 @@ async def get_facility_detail(
 
     data = facility_to_dict(amenity)
     if query_date:
-        slots = (
-            await db.execute(
-                select(FacilityBookingSlot)
-                .where(FacilityBookingSlot.amenity_id == amenity.id, FacilityBookingSlot.date == query_date)
-                .order_by(FacilityBookingSlot.start_time.asc())
-            )
-        ).scalars().all()
         maintenance = (
             await db.execute(
                 select(FacilityMaintenanceBlock).where(
@@ -592,8 +542,30 @@ async def get_facility_detail(
                 )
             )
         ).scalar_one_or_none()
-        data["slots"] = [slot_to_dict(s) for s in slots]
-        data["isUnderMaintenance"] = bool(maintenance)
+        bookings = (
+            await db.execute(
+                select(FacilityBooking).where(
+                    FacilityBooking.amenity_id == amenity.id,
+                    FacilityBooking.booking_date == query_date,
+                    FacilityBooking.status.in_(ACTIVE_BOOKING_STATUSES),
+                )
+            )
+        ).scalars().all()
+        is_blocked = bool(maintenance)
+        block_reason = maintenance.reason if maintenance else None
+        data["slots"] = [
+            generated_slot_to_dict(
+                amenity,
+                query_date=query_date,
+                start_time=start_time,
+                end_time=end_time,
+                booked_count=count_overlapping_bookings(bookings, start_time, end_time),
+                is_blocked=is_blocked,
+                block_reason=block_reason,
+            )
+            for start_time, end_time in generate_time_windows(amenity, query_date)
+        ]
+        data["isUnderMaintenance"] = is_blocked
     return {"facility": data}
 
 
@@ -627,20 +599,9 @@ async def create_booking(
             break
         booking_code = generate_booking_code()
 
-    slot = (
-        await db.execute(
-            select(FacilityBookingSlot).where(
-                FacilityBookingSlot.amenity_id == amenity.id,
-                FacilityBookingSlot.date == body.bookingDate,
-                FacilityBookingSlot.start_time == body.startTime,
-            )
-        )
-    ).scalar_one_or_none()
-
     booking = FacilityBooking(
         society_id=society_id,
         amenity_id=amenity.id,
-        slot_id=slot.id if slot else None,
         resident_id=resident.id,
         user_id=actor_id,
         booking_number=booking_number,
@@ -660,8 +621,6 @@ async def create_booking(
     )
     apply_create_audit(booking, actor_id)
     db.add(booking)
-    if slot:
-        slot.booked_count = (slot.booked_count or 0) + 1
     await db.commit()
     await db.refresh(booking)
 
@@ -753,7 +712,6 @@ async def cancel_booking(
     booking.cancelled_at = utcnow()
     booking.cancellation_reason = body.reason
     apply_update_audit(booking, actor_id)
-    await _release_slot(db, booking)
     await db.commit()
 
     publish_simple(

@@ -53,6 +53,7 @@ from Services.parking_helpers import (
     vehicle_to_dict,
     visitor_log_to_dict,
     zone_to_dict,
+    stamp_slot_entry,
 )
 from Utils.audit import apply_create_audit, apply_update_audit, utcnow
 from Utils.errors import ApiError
@@ -863,6 +864,7 @@ async def create_visitor_parking(
 
     if auto_entry and slot:
         slot.status = "visitor"
+        stamp_slot_entry(slot, at=now, actor_id=actor_id)
         apply_update_audit(slot, actor_id)
         if zone:
             await refresh_zone_slot_counts(db, zone)

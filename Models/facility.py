@@ -85,50 +85,6 @@ class Facility(Base):
     )
 
 
-class FacilityBookingSlot(Base):
-    __tablename__ = "amenity_booking_slots"
-    __table_args__ = (
-        UniqueConstraint(
-            "amenity_id", "date", "start_time", name="uq_amenity_slots_amenity_date_start"
-        ),
-        Index("ix_amenity_slots_amenity_id", "amenity_id"),
-        Index("ix_amenity_slots_society_id", "society_id"),
-        Index("ix_amenity_slots_date", "date"),
-        Index("ix_amenity_slots_is_blocked", "is_blocked"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    amenity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("amenities.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    society_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("societies.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
-    date: Mapped[date] = mapped_column(Date, nullable=False)
-    start_time: Mapped[str] = mapped_column(String(5), nullable=False)
-    end_time: Mapped[str] = mapped_column(String(5), nullable=False)
-    capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    booked_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=True, default=False)
-    block_reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-
 class FacilityBooking(Base):
     __tablename__ = "amenity_bookings"
     __table_args__ = (
@@ -156,11 +112,6 @@ class FacilityBooking(Base):
         UUID(as_uuid=True),
         ForeignKey("amenities.id", ondelete="RESTRICT"),
         nullable=False,
-    )
-    slot_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("amenity_booking_slots.id", ondelete="SET NULL"),
-        nullable=True,
     )
     resident_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -260,41 +211,4 @@ class FacilityMaintenanceBlock(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
-    )
-
-
-class FacilityCheckin(Base):
-    __tablename__ = "amenity_checkins"
-    __table_args__ = (
-        Index("ix_amenity_checkins_booking_id", "booking_id"),
-        Index("ix_amenity_checkins_society_id", "society_id"),
-        Index("ix_amenity_checkins_action", "action"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    booking_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("amenity_bookings.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    society_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("societies.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
-    action: Mapped[str] = mapped_column(String(16), nullable=False)
-    performed_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
-    performed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=func.now()
-    )
-    notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

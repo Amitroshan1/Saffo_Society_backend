@@ -54,7 +54,7 @@ async def create_gate(
         location_description=body.locationDescription,
         latitude=body.latitude,
         longitude=body.longitude,
-        geofence_radius_meters=body.geofenceRadiusMeters or 120,
+        geofence_radius_meters=body.geofenceRadiusMeters or 50,
         sequence=body.sequence,
         metadata_json=body.metadata,
         notes=body.notes,

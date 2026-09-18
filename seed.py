@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 from Core.security import hash_password
 from Database.session import AsyncSessionLocal, init_db
 from Models.billing_cycle import BillingCycle
-from Models.facility import Facility, FacilityBooking, FacilityBookingSlot
+from Models.facility import Facility, FacilityBooking
 from Models.building import Building
 from Models.parking import ParkingAllocation, ParkingSlot, ParkingZone, ResidentVehicle
 from Models.charge_head import ChargeHead
@@ -1586,48 +1586,11 @@ async def seed() -> None:
             await db.flush()
 
             tomorrow = date.today() + timedelta(days=1)
-            slot1 = FacilityBookingSlot(
-                amenity_id=clubhouse.id,
-                society_id=society.id,
-                date=tomorrow,
-                start_time="18:00",
-                end_time="19:00",
-                capacity=2,
-                booked_count=1,
-                is_blocked=False,
-                metadata_json={},
-            )
-            slot2 = FacilityBookingSlot(
-                amenity_id=clubhouse.id,
-                society_id=society.id,
-                date=tomorrow,
-                start_time="19:00",
-                end_time="20:00",
-                capacity=2,
-                booked_count=0,
-                is_blocked=False,
-                metadata_json={},
-            )
-            badminton_slot = FacilityBookingSlot(
-                amenity_id=badminton_court.id,
-                society_id=society.id,
-                date=date.today(),
-                start_time="17:00",
-                end_time="17:45",
-                capacity=1,
-                booked_count=1,
-                is_blocked=False,
-                metadata_json={},
-            )
-            db.add_all([slot1, slot2, badminton_slot])
-            await db.flush()
-
             if resident and resident_user:
                 db.add(
                     FacilityBooking(
                         society_id=society.id,
                         amenity_id=clubhouse.id,
-                        slot_id=slot1.id,
                         resident_id=resident.id,
                         user_id=resident_user.id,
                         booking_number="BKG-000001",
@@ -1652,7 +1615,6 @@ async def seed() -> None:
                     FacilityBooking(
                         society_id=society.id,
                         amenity_id=badminton_court.id,
-                        slot_id=badminton_slot.id,
                         resident_id=resident.id,
                         user_id=resident_user.id,
                         booking_number="BKG-000002",
@@ -1673,7 +1635,7 @@ async def seed() -> None:
                         updated_by=resident_user.id,
                     )
                 )
-            logger.info("Created demo amenities, slots, and bookings")
+            logger.info("Created demo amenities and bookings")
 
         # Phase 14: Parking management
         existing_zone = (

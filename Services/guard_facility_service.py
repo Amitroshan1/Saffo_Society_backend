@@ -10,7 +10,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from Events.bus import publish_simple
-from Models.facility import Facility, FacilityBooking, FacilityCheckin
+from Models.facility import Facility, FacilityBooking
 from Models.flat import Flat
 from Models.occupancy import Occupancy
 from Models.resident import Resident
@@ -217,17 +217,6 @@ async def checkin_booking(
     booking.checked_in_at = now
     booking.checked_in_by = actor_id
     apply_update_audit(booking, actor_id)
-    db.add(
-        FacilityCheckin(
-            booking_id=booking.id,
-            society_id=society_id,
-            action="check_in",
-            performed_by=actor_id,
-            performed_at=now,
-            notes=body.notes,
-            metadata_json={},
-        )
-    )
     await db.commit()
 
     publish_simple(
@@ -260,17 +249,6 @@ async def checkout_booking(
     booking.checked_out_by = actor_id
     booking.completed_at = now
     apply_update_audit(booking, actor_id)
-    db.add(
-        FacilityCheckin(
-            booking_id=booking.id,
-            society_id=society_id,
-            action="check_out",
-            performed_by=actor_id,
-            performed_at=now,
-            notes=body.notes,
-            metadata_json={},
-        )
-    )
     await db.commit()
 
     publish_simple(

@@ -115,6 +115,18 @@ class ParkingSlot(Base):
     current_allocation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
+    occupancy_entry_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    occupancy_exit_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    occupancy_entry_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    occupancy_exit_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -334,6 +346,60 @@ class VisitorParkingLog(Base):
     purpose: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class ParkingVehicleLog(Base):
+    """Resident vehicle in/out movements recorded by guards."""
+
+    __tablename__ = "parking_vehicle_logs"
+    __table_args__ = (
+        Index("ix_parking_vehicle_logs_society_id", "society_id"),
+        Index("ix_parking_vehicle_logs_slot_id", "slot_id"),
+        Index("ix_parking_vehicle_logs_status", "status"),
+        Index("ix_parking_vehicle_logs_vehicle_number", "vehicle_number"),
+        Index("ix_parking_vehicle_logs_entry_at", "entry_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    society_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("societies.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    slot_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("parking_slots.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    vehicle_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("resident_vehicles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    vehicle_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    vehicle_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    entry_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    exit_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    entry_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    exit_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

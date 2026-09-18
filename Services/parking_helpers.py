@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import string
+from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from Models.parking import (
     ParkingAllocation,
     ParkingSlot,
+    ParkingVehicleLog,
     ParkingZone,
     ResidentVehicle,
     VisitorParkingLog,
@@ -20,6 +22,90 @@ from Models.parking import (
 from Utils.errors import ApiError
 
 ACTIVE_ALLOCATION_STATUS = "active"
+
+
+def iso_dt(value: Optional[datetime]) -> Optional[str]:
+    return value.isoformat() if value else None
+
+
+def stamp_slot_entry(slot: ParkingSlot, *, at: datetime, actor_id: UUID) -> None:
+    slot.occupancy_entry_at = at
+    slot.occupancy_entry_by = actor_id
+    slot.occupancy_exit_at = None
+    slot.occupancy_exit_by = None
+
+
+def stamp_slot_exit(slot: ParkingSlot, *, at: datetime, actor_id: UUID) -> None:
+    slot.occupancy_exit_at = at
+    slot.occupancy_exit_by = actor_id
+
+
+async def open_resident_parking_log(
+    db: AsyncSession,
+    *,
+    society_id: UUID,
+    slot: ParkingSlot,
+    actor_id: UUID,
+    at: datetime,
+    vehicle: Optional[ResidentVehicle] = None,
+    vehicle_number: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> ParkingVehicleLog:
+    existing = (
+        await db.execute(
+            select(ParkingVehicleLog)
+            .where(
+                ParkingVehicleLog.society_id == society_id,
+                ParkingVehicleLog.slot_id == slot.id,
+                ParkingVehicleLog.status == "active",
+            )
+            .order_by(ParkingVehicleLog.entry_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+
+    log = ParkingVehicleLog(
+        society_id=society_id,
+        slot_id=slot.id,
+        vehicle_id=vehicle.id if vehicle else None,
+        vehicle_number=(vehicle.vehicle_number if vehicle else vehicle_number),
+        vehicle_type=vehicle.vehicle_type if vehicle else None,
+        status="active",
+        entry_at=at,
+        entry_by=actor_id,
+        notes=notes,
+        metadata_json={},
+    )
+    db.add(log)
+    return log
+
+
+async def close_resident_parking_logs(
+    db: AsyncSession,
+    *,
+    society_id: UUID,
+    slot: ParkingSlot,
+    actor_id: UUID,
+    at: datetime,
+    notes: Optional[str] = None,
+) -> None:
+    rows = (
+        await db.execute(
+            select(ParkingVehicleLog).where(
+                ParkingVehicleLog.society_id == society_id,
+                ParkingVehicleLog.slot_id == slot.id,
+                ParkingVehicleLog.status == "active",
+            )
+        )
+    ).scalars().all()
+    for log in rows:
+        log.status = "exited"
+        log.exit_at = at
+        log.exit_by = actor_id
+        if notes:
+            log.notes = notes
 
 
 def require_society_id(actor_society_id: UUID | None) -> UUID:
@@ -263,6 +349,12 @@ def slot_to_dict(
         "currentAllocationId": (
             str(slot.current_allocation_id) if slot.current_allocation_id else None
         ),
+        "entryAt": iso_dt(slot.occupancy_entry_at),
+        "exitAt": iso_dt(slot.occupancy_exit_at),
+        "occupancyEntryAt": iso_dt(slot.occupancy_entry_at),
+        "occupancyExitAt": iso_dt(slot.occupancy_exit_at),
+        "occupancyEntryBy": str(slot.occupancy_entry_by) if slot.occupancy_entry_by else None,
+        "occupancyExitBy": str(slot.occupancy_exit_by) if slot.occupancy_exit_by else None,
         "metadata": slot.metadata_json or {},
         "notes": slot.notes,
         "isActive": slot.is_active,

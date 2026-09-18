@@ -14,8 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from Models.facility import (
     Facility,
     FacilityBooking,
-    FacilityBookingSlot,
-    FacilityCheckin,
     FacilityMaintenanceBlock,
 )
 from Utils.audit import utcnow
@@ -139,18 +137,6 @@ async def check_slot_availability(
     if maintenance:
         raise ApiError(422, "Facility is under maintenance on the selected date")
 
-    slot = (
-        await db.execute(
-            select(FacilityBookingSlot).where(
-                FacilityBookingSlot.amenity_id == amenity.id,
-                FacilityBookingSlot.date == booking_date,
-                FacilityBookingSlot.start_time == start_time,
-            )
-        )
-    ).scalar_one_or_none()
-    if slot and slot.is_blocked:
-        raise ApiError(422, "Selected slot is blocked")
-
     overlap_stmt = select(FacilityBooking).where(
         FacilityBooking.amenity_id == amenity.id,
         FacilityBooking.booking_date == booking_date,
@@ -189,6 +175,58 @@ async def check_resident_booking_limit(
             422,
             f"Maximum {amenity.max_bookings_per_resident} booking(s) per day allowed for this amenity",
         )
+
+
+def generate_time_windows(amenity: Facility, query_date: date) -> list[tuple[str, str]]:
+    """Build bookable [start, end] windows from amenity hours — not stored rows."""
+    if amenity.available_days:
+        weekday = str(query_date.weekday())
+        if weekday not in amenity.available_days:
+            return []
+    if not amenity.operating_hours_start or not amenity.operating_hours_end:
+        return []
+    start_minutes = time_to_minutes(amenity.operating_hours_start)
+    end_minutes = time_to_minutes(amenity.operating_hours_end)
+    duration = amenity.slot_duration_minutes or 0
+    if duration <= 0 or start_minutes >= end_minutes:
+        return []
+    windows: list[tuple[str, str]] = []
+    t = start_minutes
+    while t + duration <= end_minutes:
+        windows.append((minutes_to_time(t), minutes_to_time(t + duration)))
+        t += duration
+    return windows
+
+
+def count_overlapping_bookings(bookings: list[FacilityBooking], start_time: str, end_time: str) -> int:
+    return sum(1 for b in bookings if b.start_time < end_time and b.end_time > start_time)
+
+
+def generated_slot_to_dict(
+    amenity: Facility,
+    *,
+    query_date: date,
+    start_time: str,
+    end_time: str,
+    booked_count: int,
+    is_blocked: bool = False,
+    block_reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    capacity = amenity.capacity or 0
+    remaining = 0 if is_blocked else max(0, capacity - booked_count)
+    return {
+        "id": None,
+        "amenityId": str(amenity.id),
+        "societyId": str(amenity.society_id),
+        "date": query_date.isoformat(),
+        "startTime": start_time,
+        "endTime": end_time,
+        "capacity": capacity,
+        "bookedCount": booked_count,
+        "isBlocked": is_blocked,
+        "blockReason": block_reason,
+        "available": remaining,
+    }
 
 
 def is_within_cancellation_window(booking: FacilityBooking, amenity: Facility) -> bool:
@@ -235,29 +273,13 @@ def facility_to_dict(amenity: Facility) -> Dict[str, Any]:
     }
 
 
-def slot_to_dict(slot: FacilityBookingSlot) -> Dict[str, Any]:
-    return {
-        "id": str(slot.id),
-        "amenityId": str(slot.amenity_id),
-        "societyId": str(slot.society_id),
-        "date": slot.date.isoformat() if slot.date else None,
-        "startTime": slot.start_time,
-        "endTime": slot.end_time,
-        "capacity": slot.capacity,
-        "bookedCount": slot.booked_count,
-        "isBlocked": slot.is_blocked,
-        "blockReason": slot.block_reason,
-        "available": max(0, (slot.capacity or 0) - (slot.booked_count or 0)),
-    }
-
-
 def booking_to_dict(booking: FacilityBooking, *, amenity: Optional[Facility] = None) -> Dict[str, Any]:
     data: Dict[str, Any] = {
         "id": str(booking.id),
         "societyId": str(booking.society_id),
         "amenityId": str(booking.amenity_id),
         "amenityName": amenity.name if amenity else None,
-        "slotId": str(booking.slot_id) if booking.slot_id else None,
+        "slotId": None,
         "residentId": str(booking.resident_id),
         "userId": str(booking.user_id),
         "bookingNumber": booking.booking_number,
@@ -303,16 +325,4 @@ def maintenance_block_to_dict(block: FacilityMaintenanceBlock) -> Dict[str, Any]
         "createdBy": str(block.created_by) if block.created_by else None,
         "isActive": block.is_active,
         "createdAt": block.created_at.isoformat() if block.created_at else None,
-    }
-
-
-def checkin_to_dict(checkin: FacilityCheckin) -> Dict[str, Any]:
-    return {
-        "id": str(checkin.id),
-        "bookingId": str(checkin.booking_id),
-        "societyId": str(checkin.society_id),
-        "action": checkin.action,
-        "performedBy": str(checkin.performed_by),
-        "performedAt": checkin.performed_at.isoformat() if checkin.performed_at else None,
-        "notes": checkin.notes,
     }

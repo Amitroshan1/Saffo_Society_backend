@@ -26,13 +26,18 @@ from Schemas.parking import (
 from Services import parking_service
 from Services.parking_helpers import (
     ACTIVE_ALLOCATION_STATUS,
+    close_resident_parking_logs,
     ensure_visitor_parking_allowed,
     get_slot_in_society,
     get_visitor_log_in_society,
     get_zone_in_society,
+    iso_dt,
+    open_resident_parking_log,
     refresh_zone_slot_counts,
     require_society_id,
     slot_to_dict,
+    stamp_slot_entry,
+    stamp_slot_exit,
     vehicle_to_dict,
     visitor_log_to_dict,
 )
@@ -133,9 +138,12 @@ async def guard_today(
                 "residentName": None,
                 "parkingCode": log.parking_code,
                 "slotCode": slot.slot_code if slot else None,
+                "slotId": str(log.slot_id) if log.slot_id else None,
                 "slotStatus": slot.status if slot else None,
                 "status": log.status,
-                "entryAt": log.entry_at.isoformat() if log.entry_at else None,
+                "entryAt": iso_dt(log.entry_at) or iso_dt(getattr(slot, "occupancy_entry_at", None)),
+                "exitAt": iso_dt(log.exit_at),
+                "entryBy": str(log.entry_by) if log.entry_by else None,
             }
         )
 
@@ -153,10 +161,13 @@ async def guard_today(
                 "vehicleType": vehicle.vehicle_type if vehicle else None,
                 "residentName": resident.name if resident else None,
                 "parkingCode": vehicle.parking_code if vehicle else None,
+                "slotId": str(slot.id),
                 "slotCode": slot.slot_code,
                 "slotStatus": slot.status,
                 "status": slot.status,
-                "entryAt": None,
+                "entryAt": iso_dt(slot.occupancy_entry_at) or iso_dt(slot.last_activity_at),
+                "exitAt": None,
+                "entryBy": str(slot.occupancy_entry_by) if slot.occupancy_entry_by else None,
             }
         )
 
@@ -218,14 +229,22 @@ async def guard_today(
     slots_list: list[Dict[str, Any]] = []
     for slot in all_slots:
         parked_row = parked_by_slot.get(slot.slot_code)
+        inside = slot.status in ("occupied", "visitor")
         slots_list.append(
             {
                 "id": str(slot.id),
                 "code": slot.slot_code,
                 "slotCode": slot.slot_code,
                 "status": slot.status,
+                "slotCategory": slot.slot_category,
                 "vehicleNumber": parked_row.get("vehicleNumber") if parked_row else None,
                 "kind": parked_row.get("kind") if parked_row else "slot",
+                "entryAt": (
+                    parked_row.get("entryAt")
+                    if parked_row and parked_row.get("entryAt")
+                    else iso_dt(slot.occupancy_entry_at) if inside else None
+                ),
+                "exitAt": None if inside else iso_dt(slot.occupancy_exit_at),
                 "label": (
                     f"{slot.slot_code} · {parked_row['vehicleNumber']}"
                     if parked_row and parked_row.get("vehicleNumber")
@@ -296,6 +315,7 @@ async def vehicle_entry(
             zone = await get_zone_in_society(db, slot.zone_id, society_id)
             ensure_visitor_parking_allowed(zone, slot)
             slot.status = "visitor"
+            stamp_slot_entry(slot, at=now, actor_id=actor_id)
             apply_update_audit(slot, actor_id)
             await refresh_zone_slot_counts(db, zone)
         await db.commit()
@@ -305,7 +325,11 @@ async def vehicle_entry(
             entity_type="visitor_parking_log",
             entity_id=visitor_log.id,
             actor_id=actor_id,
-            payload={"logId": str(visitor_log.id), "type": "visitor"},
+            payload={
+                "logId": str(visitor_log.id),
+                "type": "visitor",
+                "entryAt": iso_dt(visitor_log.entry_at),
+            },
         )
         return {"entry": visitor_log_to_dict(visitor_log), "type": "visitor"}
 
@@ -353,12 +377,26 @@ async def vehicle_entry(
     if slot.status in ("maintenance", "blocked", "inactive"):
         raise ApiError(422, f"Slot is {slot.status}")
 
+    already_inside = slot.status == "occupied" and slot.occupancy_entry_at
     slot.status = "occupied"
+    if not already_inside:
+        stamp_slot_entry(slot, at=now, actor_id=actor_id)
     apply_update_audit(slot, actor_id)
+    await open_resident_parking_log(
+        db,
+        society_id=society_id,
+        slot=slot,
+        actor_id=actor_id,
+        at=slot.occupancy_entry_at or now,
+        vehicle=vehicle,
+        vehicle_number=body.vehicleNumber,
+        notes=body.notes,
+    )
     zone = await get_zone_in_society(db, slot.zone_id, society_id)
     await refresh_zone_slot_counts(db, zone)
     await db.commit()
 
+    entered_at = iso_dt(slot.occupancy_entry_at) or now.isoformat()
     publish_simple(
         "VehicleEntry",
         society_id=society_id,
@@ -369,13 +407,15 @@ async def vehicle_entry(
             "slotId": str(slot.id),
             "vehicleId": str(vehicle.id) if vehicle else None,
             "type": "resident",
+            "entryAt": entered_at,
         },
     )
     return {
         "entry": {
             "slot": slot_to_dict(slot, zone=zone),
             "vehicle": vehicle_to_dict(vehicle) if vehicle else None,
-            "enteredAt": now.isoformat(),
+            "enteredAt": entered_at,
+            "entryAt": entered_at,
         },
         "type": "resident",
     }
@@ -436,6 +476,7 @@ async def vehicle_exit(
         if visitor_log.slot_id:
             slot = await get_slot_in_society(db, visitor_log.slot_id, society_id)
             slot.status = "available"
+            stamp_slot_exit(slot, at=now, actor_id=actor_id)
             apply_update_audit(slot, actor_id)
             zone = await get_zone_in_society(db, slot.zone_id, society_id)
             await refresh_zone_slot_counts(db, zone)
@@ -446,7 +487,12 @@ async def vehicle_exit(
             entity_type="visitor_parking_log",
             entity_id=visitor_log.id,
             actor_id=actor_id,
-            payload={"logId": str(visitor_log.id), "type": "visitor"},
+            payload={
+                "logId": str(visitor_log.id),
+                "type": "visitor",
+                "entryAt": iso_dt(visitor_log.entry_at),
+                "exitAt": iso_dt(visitor_log.exit_at),
+            },
         )
         return {"exit": visitor_log_to_dict(visitor_log), "type": "visitor"}
 
@@ -504,20 +550,35 @@ async def vehicle_exit(
         slot.status = "allocated"
     else:
         slot.status = "available"
+    stamp_slot_exit(slot, at=now, actor_id=actor_id)
     apply_update_audit(slot, actor_id)
+    await close_resident_parking_logs(
+        db,
+        society_id=society_id,
+        slot=slot,
+        actor_id=actor_id,
+        at=now,
+        notes=body.notes,
+    )
     zone = await get_zone_in_society(db, slot.zone_id, society_id)
     await refresh_zone_slot_counts(db, zone)
     await db.commit()
 
+    exited_at = iso_dt(slot.occupancy_exit_at) or now.isoformat()
     publish_simple(
         "VehicleExit",
         society_id=society_id,
         entity_type="parking_slot",
         entity_id=slot.id,
         actor_id=actor_id,
-        payload={"slotId": str(slot.id), "type": "resident"},
+        payload={"slotId": str(slot.id), "type": "resident", "exitAt": exited_at},
     )
     return {
-        "exit": {"slot": slot_to_dict(slot, zone=zone), "exitedAt": now.isoformat()},
+        "exit": {
+            "slot": slot_to_dict(slot, zone=zone),
+            "exitedAt": exited_at,
+            "exitAt": exited_at,
+            "entryAt": iso_dt(slot.occupancy_entry_at),
+        },
         "type": "resident",
     }

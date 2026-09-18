@@ -1,8 +1,6 @@
 from Models.facility import (
     Facility,
     FacilityBooking,
-    FacilityBookingSlot,
-    FacilityCheckin,
     FacilityMaintenanceBlock,
 )
 from Models.analytics import (
@@ -88,6 +86,7 @@ from Models.platform import (
 from Models.parking import (
     ParkingAllocation,
     ParkingSlot,
+    ParkingVehicleLog,
     ParkingZone,
     ResidentVehicle,
     VisitorParkingLog,
@@ -107,8 +106,6 @@ __all__ = [
     "AccountingPeriod",
     "Facility",
     "FacilityBooking",
-    "FacilityBookingSlot",
-    "FacilityCheckin",
     "FacilityMaintenanceBlock",
     "AnalyticsAccessLog",
     "AnalyticsDailyFact",
@@ -161,6 +158,7 @@ __all__ = [
     "Occupancy",
     "ParkingAllocation",
     "ParkingSlot",
+    "ParkingVehicleLog",
     "ParkingZone",
     "Payment",
     "PaymentAllocation",
