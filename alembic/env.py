@@ -25,6 +25,16 @@ from modules.facility.models import Amenity, Booking  # noqa: F401
 from modules.vehicle.models import ParkingSlot, Vehicle, VisitorParking  # noqa: F401
 from modules.clearance.models import Clearance, ClearanceDocument  # noqa: F401
 from modules.notification.models import Notification  # noqa: F401
+from modules.guard_visitor.models import VisitGateEntry  # noqa: F401
+from modules.guard_sos.models import SosResolution  # noqa: F401
+from modules.staff.models import Staff, StaffLog  # noqa: F401
+from modules.schedule.models import PunchLog, Shift  # noqa: F401
+from modules.parking.models import Parking, ParkingLog  # noqa: F401
+from modules.move_out.models import MoveOut, MoveOutFile  # noqa: F401
+from modules.guard_profile.models import GuardProfile  # noqa: F401
+from modules.document.models import GateDocument  # noqa: F401
+from modules.delivery.models import Delivery  # noqa: F401
+from modules.cab.models import Cab  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

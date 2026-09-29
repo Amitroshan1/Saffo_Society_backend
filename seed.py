@@ -8,6 +8,10 @@ from modules.society.models import Society
 from modules.resident.models import Building, Flat, HouseholdMember, Occupancy, Resident
 from modules.facility.models import Amenity
 from modules.vehicle.models import ParkingSlot, Vehicle
+from datetime import date, time
+
+from modules.guard_profile.models import GuardProfile
+from modules.schedule.models import Shift
 
 def upsert_permissions(db: Session) -> dict[str, int]:
     perm_ids = {}
@@ -193,11 +197,57 @@ def run() -> None:
                 )
             )
 
+        guard_user = upsert_user(db, "guard@society.com", "Admin@123", False)
+        upsert_membership(db, guard_user, society, role_ids["security_guard"])
+
+        if not db.query(GuardProfile).filter(GuardProfile.user_id == guard_user.id).first():
+            db.add(
+                GuardProfile(
+                    society_id=society.id,
+                    user_id=guard_user.id,
+                    name="Demo Guard",
+                    email=guard_user.email,
+                    phone="9876500000",
+                    designation="Security Guard",
+                    staff_code="G-001",
+                    gate_name="Main Gate",
+                    gate_code="MG",
+                    joining_date=date.today(),
+                    is_active=True,
+                )
+            )
+
+        today = date.today()
+        shift = db.query(Shift).filter(
+            Shift.guard_user_id == guard_user.id, Shift.duty_date == today
+        ).first()
+        if not shift:
+            db.add(
+                Shift(
+                    society_id=society.id,
+                    guard_user_id=guard_user.id,
+                    staff_name="Demo Guard",
+                    staff_code="G-001",
+                    gate_name="Main Gate",
+                    gate_code="MG",
+                    latitude=18.5204,
+                    longitude=73.8567,
+                    radius_meters=100,
+                    duty_date=today,
+                    shift_type="morning",
+                    start_time=time(6, 0),
+                    end_time=time(14, 0),
+                    status="scheduled",
+                )
+            )
+
         db.commit()
         print("Seed done.")
         print("  superadmin@local.com / Admin@123  (platform, no society)")
         print("  admin@demo.com / Admin@123        (society: demo, role: admin)")
         print("  resident@society.com / Admin@123   (flat A-101, role: resident)")
+        print("  resident@society.com / Admin@123   (flat A-101, role: resident)")
+        print("  guard@society.com / Admin@123      (society: demo, role: security_guard)")
     except Exception:
         db.rollback()
         raise
