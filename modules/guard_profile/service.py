@@ -6,10 +6,12 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
+from auth.models import User
+from core.security import hash_password, verify_password
 from modules.guard_common.deps import GuardUser
 from modules.guard_common.settings import GUARD_PHOTO_UPLOAD_DIR, MAX_GUARD_PHOTO_BYTES
 from modules.guard_profile.models import GuardProfile, now_ist
-from modules.guard_profile.schemas import GuardProfileItem
+from modules.guard_profile.schemas import ChangePasswordIn, GuardProfileItem, GuardProfileUpdate
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -126,6 +128,46 @@ def _save_photo(file: UploadFile) -> str:
 
 def get_profile(db: Session, current_user: GuardUser) -> GuardProfileItem:
     return _to_item(_own_profile(db, current_user))
+
+
+def update_profile(
+    db: Session, current_user: GuardUser, data: GuardProfileUpdate
+) -> GuardProfileItem:
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required")
+    if len(name) > 150:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is too long")
+
+    phone = (data.phone or "").strip() or None
+    if phone is not None and (len(phone) < 10 or len(phone) > 20):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone must be between 10 and 20 characters",
+        )
+
+    row = _own_profile(db, current_user)
+    row.name = name
+    row.phone = phone
+    row.updated_at = now_ist()
+    db.commit()
+    db.refresh(row)
+    return _to_item(row)
+
+
+def change_password(db: Session, current_user: GuardUser, data: ChangePasswordIn) -> None:
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not verify_password(data.current_password, user.password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is wrong")
+    if len(data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 8 characters",
+        )
+    user.password = hash_password(data.new_password)
+    db.commit()
 
 
 def replace_photo(db: Session, current_user: GuardUser, photo: UploadFile) -> GuardProfileItem:

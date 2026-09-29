@@ -17,3 +17,13 @@ class GuardProfileItem(BaseModel):
     photoUrl: Optional[str] = None
     joiningDate: Optional[date] = None
     isActive: bool
+
+
+class GuardProfileUpdate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str

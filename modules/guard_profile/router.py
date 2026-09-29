@@ -4,7 +4,14 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
-from modules.guard_profile.service import clear_photo, get_profile, replace_photo
+from modules.guard_profile.schemas import ChangePasswordIn, GuardProfileUpdate
+from modules.guard_profile.service import (
+    change_password,
+    clear_photo,
+    get_profile,
+    replace_photo,
+    update_profile,
+)
 
 router = APIRouter(tags=["Guard Profile"])
 
@@ -16,6 +23,26 @@ def fetch_profile(
 ):
     item = get_profile(db, current_user)
     return success_response("Guard profile fetched", item.model_dump(mode="json"))
+
+
+@router.patch("/guard/profile")
+def patch_profile(
+    data: GuardProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: GuardUser = Depends(require_guard),
+):
+    item = update_profile(db, current_user, data)
+    return success_response("Guard profile updated", item.model_dump(mode="json"))
+
+
+@router.patch("/guard/change-password")
+def patch_password(
+    data: ChangePasswordIn,
+    db: Session = Depends(get_db),
+    current_user: GuardUser = Depends(require_guard),
+):
+    change_password(db, current_user, data)
+    return success_response("Password updated")
 
 
 @router.post("/guard/profile/photo")
