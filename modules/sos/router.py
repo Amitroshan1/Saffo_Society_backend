@@ -1,21 +1,28 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import AuthContext, require_resident
+from modules.guard_sos.manager import broadcast_sos_created
+from modules.guard_sos.service import created_payload
 from modules.sos import service
-from modules.sos.schemas import SosCreate, SosOut
+from modules.sos.schemas import SosOut
 
 router = APIRouter(prefix="/resident", tags=["Resident SOS"])
 
 
 @router.post("/sos", response_model=SosOut, status_code=201)
-def create_sos(
-    data: SosCreate,
+async def create_sos(
+    title: str = Form(...),
+    description: str = Form(...),
+    file: UploadFile | None = File(None),
     ctx: AuthContext = Depends(require_resident),
     db: Session = Depends(get_db),
 ):
-    return service.create_sos(db, ctx.user.id, ctx.society_id, data)
+    saved = service.create_sos(db, ctx.user.id, ctx.society_id, title, description, file)
+    society_id, payload = created_payload(db, saved["id"])
+    await broadcast_sos_created(society_id, payload)
+    return saved
 
 
 @router.get("/sos", response_model=list[SosOut])

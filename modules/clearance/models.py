@@ -16,6 +16,8 @@ class Clearance(Base):
     status = Column(String(20), nullable=False, default="open")
     dues_clear = Column(Boolean, default=False, nullable=False)
     move_out_date = Column(Date, nullable=True)
+    allowed_at = Column(DateTime(timezone=True), nullable=True)
+    allowed_by = Column(Integer, nullable=True, index=True)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(ZoneInfo("Asia/Kolkata")),

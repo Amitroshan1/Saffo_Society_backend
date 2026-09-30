@@ -37,6 +37,7 @@ def _to_item(
         flatNo=flat.number,
         title=alert.title,
         message=alert.description,
+        photoUrl=alert.photo_url,
         priority=alert.priority,
         status=DB_TO_UI.get(alert.status, alert.status),
         createdAt=alert.created_at,
@@ -72,6 +73,16 @@ def _get_row(db: Session, current_user: GuardUser, sos_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="SOS alert not found")
     return row
+
+
+def created_payload(db: Session, sos_id: int) -> tuple[int, dict]:
+    alert = db.query(SosAlert).filter(SosAlert.id == sos_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="SOS alert not found")
+    row = base_query(db, alert.society_id).filter(SosAlert.id == sos_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="SOS alert not found")
+    return alert.society_id, _to_item(*row).model_dump(mode="json")
 
 
 def list_sos_alerts(

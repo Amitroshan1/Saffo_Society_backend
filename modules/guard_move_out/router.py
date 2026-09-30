@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
-from modules.move_out.service import allow_move_out, get_move_out, list_move_outs, open_move_out_file
+from modules.guard_move_out.service import allow_move_out, get_move_out, list_move_outs
 
 router = APIRouter(tags=["Guard Move-out"])
 
@@ -34,31 +33,21 @@ def fetch_move_outs(
     return success_response("Move-out clearance fetched", data.model_dump(mode="json"))
 
 
-@router.get("/guard/move-out/{move_out_id}")
+@router.get("/guard/move-out/{clearance_id}")
 def fetch_move_out(
-    move_out_id: int,
+    clearance_id: int,
     db: Session = Depends(get_db),
     current_user: GuardUser = Depends(require_guard),
 ):
-    item = get_move_out(db, current_user, move_out_id)
+    item = get_move_out(db, current_user, clearance_id)
     return success_response("Move-out fetched", item.model_dump(mode="json"))
 
 
-@router.get("/guard/move-out/{move_out_id}/files/{file_id}")
-def view_move_out_file(
-    move_out_id: int,
-    file_id: int,
-    db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
-) -> FileResponse:
-    return open_move_out_file(db, current_user, move_out_id, file_id)
-
-
-@router.patch("/guard/move-out/{move_out_id}/allow")
+@router.patch("/guard/move-out/{clearance_id}/allow")
 def mark_move_out_allowed(
-    move_out_id: int,
+    clearance_id: int,
     db: Session = Depends(get_db),
     current_user: GuardUser = Depends(require_guard),
 ):
-    item = allow_move_out(db, current_user, move_out_id)
+    item = allow_move_out(db, current_user, clearance_id)
     return success_response("Move-out allowed", item.model_dump(mode="json"))

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -8,7 +8,6 @@ from modules.clearance import service
 from modules.clearance.schemas import (
     ClearanceCreate,
     ClearanceOut,
-    DocumentCreate,
     GuardClearanceOut,
 )
 
@@ -32,11 +31,14 @@ def open_clearance(
 @router.post("/resident/clearances/{clearance_id}/documents", response_model=ClearanceOut)
 def upload_document(
     clearance_id: int,
-    data: DocumentCreate,
+    doc_type: str = Form(...),
+    file: UploadFile = File(...),
     ctx: AuthContext = Depends(require_resident),
     db: Session = Depends(get_db),
 ):
-    return service.add_document(db, ctx.user.id, ctx.society_id, clearance_id, data)
+    return service.add_document(
+        db, ctx.user.id, ctx.society_id, clearance_id, file, doc_type
+    )
 
 
 @router.post("/clearances/{clearance_id}/dues", response_model=ClearanceOut)

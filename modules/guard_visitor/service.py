@@ -7,7 +7,7 @@ from datetime import date, datetime, time
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Query, Session, contains_eager
 
 from modules.guard_common.deps import GuardUser
@@ -21,6 +21,7 @@ from modules.guard_visitor.models import (
     UI_INSIDE,
     UI_PENDING,
     UI_REJECTED,
+    VISIT_APPROVED,
     VISIT_CANCELLED,
     VISIT_CHECKED_IN,
     VISIT_CHECKED_OUT,
@@ -62,7 +63,23 @@ ALLOWED_VEHICLE_TYPES = {
     "bicycle",
     "other",
 }
-CHECK_IN_READY = (VISIT_SCHEDULED, VISIT_WAITING)
+
+
+def is_guard_approved_visit(visit: Visit) -> bool:
+    """Approved now, or an older pre-approved scheduled/waiting row."""
+    return visit.status == VISIT_APPROVED or (
+        bool(visit.is_preapproved) and visit.status in {VISIT_SCHEDULED, VISIT_WAITING}
+    )
+
+
+def approved_visit_clause():
+    return or_(
+        Visit.status == VISIT_APPROVED,
+        and_(
+            Visit.is_preapproved.is_(True),
+            Visit.status.in_((VISIT_SCHEDULED, VISIT_WAITING)),
+        ),
+    )
 
 
 def status_clause(ui_status: str):
@@ -70,7 +87,7 @@ def status_clause(ui_status: str):
     if ui_status == UI_PENDING:
         return and_(Visit.status == VISIT_WAITING, Visit.is_preapproved.is_(False))
     if ui_status == UI_APPROVED:
-        return and_(Visit.status.in_(CHECK_IN_READY), Visit.is_preapproved.is_(True))
+        return approved_visit_clause()
     if ui_status == UI_INSIDE:
         return Visit.status == VISIT_CHECKED_IN
     if ui_status == UI_EXITED:
@@ -87,8 +104,10 @@ def _ui_status(visit: Visit) -> str:
         return UI_INSIDE
     if visit.status == VISIT_CHECKED_OUT:
         return UI_EXITED
-    if visit.status in CHECK_IN_READY:
-        return UI_APPROVED if visit.is_preapproved else UI_PENDING
+    if is_guard_approved_visit(visit):
+        return UI_APPROVED
+    if visit.status == VISIT_WAITING:
+        return UI_PENDING
     return visit.status
 
 
@@ -438,7 +457,7 @@ def check_in_visitor(
 ) -> VisitorItem:
     """Guard marks entry only after the resident approved or pre-invited the visitor."""
     visit, entry, flat, building = _get_row(db, current_user, visit_id)
-    if visit.status not in CHECK_IN_READY or not visit.is_preapproved:
+    if not is_guard_approved_visit(visit):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Visitor must be approved by resident before check-in",

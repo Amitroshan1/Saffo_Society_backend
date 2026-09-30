@@ -28,7 +28,7 @@ INDEXES = {
     'parking_logs': [
         'id', 'society_id', 'parking_id', 'parking_type', 'entry_time', 'exit_time', 'recorded_by',
     ],
-    'move_out': ['id', 'society_id', 'resident_id', 'flat_no', 'move_out_date', 'allowed_by'],
+    'guard_move_out': ['id', 'society_id', 'resident_id', 'flat_no', 'move_out_date', 'allowed_by'],
     'move_out_files': ['id', 'society_id', 'move_out_id', 'uploaded_by'],
     'guard_profiles': ['id', 'society_id', 'user_id'],
     'documents': ['id', 'society_id', 'category', 'published_at', 'uploaded_by'],
@@ -142,7 +142,7 @@ def upgrade() -> None:
         'uq_parking_logs_one_open', 'parking_logs', ['society_id', 'parking_id'],
         unique=True, postgresql_where=sa.text('exit_time IS NULL'),
     )
-    op.create_table('move_out',
+    op.create_table('guard_move_out',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('society_id', sa.Integer(), nullable=False),
     sa.Column('resident_id', sa.Integer(), nullable=False),
@@ -170,7 +170,7 @@ def upgrade() -> None:
     sa.Column('size_bytes', sa.Integer(), nullable=False),
     sa.Column('uploaded_by', sa.Integer(), nullable=False),
     sa.Column('created_at', TZ, nullable=False),
-    sa.ForeignKeyConstraint(['move_out_id'], ['move_out.id'], ),
+    sa.ForeignKeyConstraint(['move_out_id'], ['guard_move_out.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('guard_profiles',
@@ -301,7 +301,7 @@ def downgrade() -> None:
     op.drop_table('documents')
     op.drop_table('guard_profiles')
     op.drop_table('move_out_files')
-    op.drop_table('move_out')
+    op.drop_table('guard_move_out')
     op.drop_table('parking_logs')
     op.drop_table('parking')
     op.drop_table('punch_logs')

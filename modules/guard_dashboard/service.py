@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 
-from sqlalchemy import and_, func
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, exists, func
+from sqlalchemy.orm import Session, joinedload
 
 from modules.cab.models import STATUS_APPROVED as CAB_APPROVED
 from modules.cab.models import STATUS_INSIDE as CAB_INSIDE
@@ -25,8 +25,11 @@ from modules.guard_dashboard.schemas import (
     SosPreview,
     WaitingItem,
 )
-from modules.move_out.models import MoveOut
-from modules.parking.models import SLOT_RESIDENT, SLOT_VISITOR, Parking, ParkingLog
+from modules.clearance.models import Clearance
+from modules.clearance.service import ALL_CHECKS
+from modules.resident.models import Occupancy
+from modules.parking.models import SLOT_RESIDENT, SLOT_VISITOR, ParkingLog
+from modules.vehicle.models import ParkingSlot, Vehicle
 from modules.schedule.models import (
     ACTION_IN,
     IST,
@@ -211,19 +214,29 @@ def _inside(db: Session, society_id: int, today: date) -> list[InsideItem]:
 
 def _move_outs(db: Session, society_id: int) -> tuple[int, list[MoveOutReadyItem]]:
     ready = and_(
-        MoveOut.allowed_at.is_(None),
-        MoveOut.leave_license.is_(True),
-        MoveOut.tenant_id_proof.is_(True),
-        MoveOut.owner_confirmation.is_(True),
-        MoveOut.dues_clearance.is_(True),
+        Clearance.allowed_at.is_(None),
+        Clearance.status == "open",
+        ALL_CHECKS,
     )
-    query = db.query(MoveOut).filter(MoveOut.society_id == society_id, ready)
-    rows = query.order_by(MoveOut.move_out_date.asc(), MoveOut.id.asc()).limit(PREVIEW_LIMIT).all()
-    return query.count(), [
+    query = (
+        db.query(Clearance)
+        .options(
+            joinedload(Clearance.occupancy).joinedload(Occupancy.resident),
+            joinedload(Clearance.occupancy).joinedload(Occupancy.flat),
+        )
+        .filter(Clearance.society_id == society_id, ready)
+    )
+    total = query.count()
+    rows = (
+        query.order_by(Clearance.move_out_date.asc().nulls_last(), Clearance.id.asc())
+        .limit(PREVIEW_LIMIT)
+        .all()
+    )
+    return total, [
         MoveOutReadyItem(
             id=row.id,
-            residentName=row.resident_name,
-            flatNo=row.flat_no,
+            residentName=row.occupancy.resident.full_name,
+            flatNo=row.occupancy.flat.number,
             moveOutDate=row.move_out_date,
         )
         for row in rows
@@ -269,14 +282,17 @@ def _parking_in_use(db: Session, society_id: int) -> int:
         ParkingLog.society_id == society_id,
         ParkingLog.exit_time.is_(None),
     )
-    owner = func.length(func.trim(func.coalesce(Parking.resident_name, ""))) > 0
+    has_vehicle = exists().where(
+        and_(Vehicle.slot_id == ParkingSlot.id, Vehicle.society_id == society_id)
+    )
     resident_inside = (
-        db.query(Parking)
+        db.query(ParkingSlot)
         .filter(
-            Parking.society_id == society_id,
-            Parking.slot_type == SLOT_RESIDENT,
-            owner,
-            Parking.id.in_(open_slot_ids),
+            ParkingSlot.society_id == society_id,
+            ParkingSlot.kind == SLOT_RESIDENT,
+            ParkingSlot.is_active.is_(True),
+            has_vehicle,
+            ParkingSlot.id.in_(open_slot_ids),
         )
         .count()
     )

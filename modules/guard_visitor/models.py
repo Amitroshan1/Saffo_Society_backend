@@ -11,6 +11,7 @@ IST = ZoneInfo("Asia/Kolkata")
 # visits.status values shared with the resident visitor module
 VISIT_SCHEDULED = "scheduled"
 VISIT_WAITING = "waiting"
+VISIT_APPROVED = "approved"
 VISIT_REJECTED = "rejected"
 VISIT_CANCELLED = "cancelled"
 VISIT_CHECKED_IN = "checked_in"

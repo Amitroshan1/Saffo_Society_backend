@@ -19,12 +19,10 @@ class MoveOutCounts(BaseModel):
     allowed: int
 
 
-class MoveOutFileItem(BaseModel):
+class MoveOutDocumentItem(BaseModel):
     id: int
-    title: str
-    fileName: str
-    sizeBytes: int
-    viewUrl: str
+    docType: str
+    fileUrl: str
 
 
 class MoveOutItem(BaseModel):
@@ -32,8 +30,7 @@ class MoveOutItem(BaseModel):
     residentName: str
     flatNo: str
     buildingNo: str
-    wingNo: str | None = None
-    moveOutDate: date
+    moveOutDate: date | None = None
     leaveLicense: bool
     tenantIdProof: bool
     ownerConfirmation: bool
@@ -41,7 +38,7 @@ class MoveOutItem(BaseModel):
     status: str
     canAllow: bool
     allowedAt: datetime | None = None
-    documents: list[MoveOutFileItem]
+    documents: list[MoveOutDocumentItem]
 
 
 class MoveOutListData(BaseModel):

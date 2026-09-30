@@ -45,7 +45,7 @@ class MoveOutReadyItem(BaseModel):
     id: int
     residentName: str
     flatNo: str
-    moveOutDate: date
+    moveOutDate: Optional[date] = None
 
 
 class BookingPreview(BaseModel):
