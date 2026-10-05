@@ -54,7 +54,7 @@ def update_vehicle(
 @router.delete("/vehicles/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_vehicle(
     vehicle_id: int,
-    ctx: AuthContext = Depends(require_resident),
+    ctx: AuthContext = Depends(require_permission(PARKING_UPDATE)),
     db: Session = Depends(get_db),
 ):
     service.delete_vehicle(db, ctx.user.id, ctx.society_id, vehicle_id)
@@ -62,7 +62,10 @@ def remove_vehicle(
 
 
 @router.get("/visitor-parking/slots", response_model=list[SlotOut])
-def free_visitor_slots(ctx: AuthContext = Depends(require_resident), db: Session = Depends(get_db)):
+def free_visitor_slots(
+    ctx: AuthContext = Depends(require_permission(PARKING_VIEW)),
+    db: Session = Depends(get_db),
+):
     return service.list_free_visitor_slots(db, ctx.user.id, ctx.society_id)
 
 
