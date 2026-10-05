@@ -1,7 +1,9 @@
 from fastapi import HTTPException
+from sqlalchemy import and_, exists
 from sqlalchemy.orm import Session
 
 from modules.notification.service import record
+from modules.parking.models import ParkingLog
 from modules.resident.service import _occupancy_or_404
 from modules.vehicle.models import ParkingSlot, Vehicle, VisitorParking
 from modules.vehicle.schemas import VehicleCreate, VehicleUpdate, VisitorParkingCreate
@@ -202,6 +204,59 @@ def update_vehicle(
     db.commit()
     db.refresh(row)
     return _vehicle_out(row)
+
+
+def delete_vehicle(db: Session, user_id: int, society_id: int | None, vehicle_id: int) -> None:
+    _, occupancy = _occupancy_or_404(db, user_id, society_id)
+    row = (
+        db.query(Vehicle)
+        .filter(
+            Vehicle.id == vehicle_id,
+            Vehicle.occupancy_id == occupancy.id,
+            Vehicle.society_id == occupancy.society_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    db.delete(row)
+    db.commit()
+
+
+def _visitor_slot_taken(society_id: int):
+    active_allocation = exists().where(
+        and_(
+            VisitorParking.slot_id == ParkingSlot.id,
+            VisitorParking.society_id == society_id,
+            VisitorParking.status == "active",
+        )
+    )
+    open_log = exists().where(
+        and_(
+            ParkingLog.parking_id == ParkingSlot.id,
+            ParkingLog.society_id == society_id,
+            ParkingLog.exit_time.is_(None),
+        )
+    )
+    return active_allocation, open_log
+
+
+def list_free_visitor_slots(db: Session, user_id: int, society_id: int | None) -> list:
+    _, occupancy = _occupancy_or_404(db, user_id, society_id)
+    active_allocation, open_log = _visitor_slot_taken(occupancy.society_id)
+    rows = (
+        db.query(ParkingSlot)
+        .filter(
+            ParkingSlot.society_id == occupancy.society_id,
+            ParkingSlot.kind == "visitor",
+            ParkingSlot.is_active.is_(True),
+            ~active_allocation,
+            ~open_log,
+        )
+        .order_by(ParkingSlot.code.asc())
+        .all()
+    )
+    return [{"id": slot.id, "code": slot.code, "kind": slot.kind} for slot in rows]
 
 
 def _take_visitor_slot(db: Session, society_id: int) -> ParkingSlot:

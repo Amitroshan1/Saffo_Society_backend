@@ -29,8 +29,7 @@ from modules.guard_visitor.models import VisitGateEntry  # noqa: F401
 from modules.guard_sos.models import SosResolution  # noqa: F401
 from modules.staff.models import Staff, StaffLog  # noqa: F401
 from modules.schedule.models import PunchLog, Shift  # noqa: F401
-from modules.parking.models import Parking, ParkingLog  # noqa: F401
-from modules.move_out.models import MoveOut, MoveOutFile  # noqa: F401
+from modules.parking.models import ParkingLog  # noqa: F401
 from modules.guard_profile.models import GuardProfile  # noqa: F401
 from modules.document.models import GateDocument  # noqa: F401
 from modules.delivery.models import Delivery  # noqa: F401

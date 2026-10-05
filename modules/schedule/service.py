@@ -81,6 +81,9 @@ def _to_shift(shift: Shift) -> ShiftItem:
         startTime=_clock(shift.start_time),
         endTime=_clock(shift.end_time),
         status=shift.status,
+        latitude=shift.latitude,
+        longitude=shift.longitude,
+        radiusMeters=shift.radius_meters,
     )
 
 

@@ -143,7 +143,9 @@ def gate_dashboard(db: Session, user_id: int, society_id: int | None) -> dict:
     return {
         "welcome": resident.full_name,
         "flat": f"{flat['building_name']}-{flat['flat_number']}",
-        "pending_at_gate": [_visit_card(v) for v in visits if v.status == "waiting"],
+        "pending_at_gate": [
+            _visit_card(v) for v in visits if v.status == "waiting" and not v.is_preapproved
+        ],
         "upcoming_invites": [_visit_card(v) for v in visits if v.status == "scheduled"],
         "active_sos": [
             {"id": row.id, "title": row.title, "status": row.status, "priority": row.priority}

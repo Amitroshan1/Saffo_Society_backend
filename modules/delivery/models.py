@@ -12,6 +12,8 @@ STATUS_APPROVED = "approved"
 STATUS_REJECTED = "rejected"
 STATUS_INSIDE = "inside"
 STATUS_EXITED = "exited"
+STATUS_HELD = "held"
+STATUS_COLLECTED = "collected"
 
 STATUSES = (
     STATUS_PENDING,
@@ -19,6 +21,8 @@ STATUSES = (
     STATUS_REJECTED,
     STATUS_INSIDE,
     STATUS_EXITED,
+    STATUS_HELD,
+    STATUS_COLLECTED,
 )
 
 RECEIVED_BY_GUARD = "received_by_guard"

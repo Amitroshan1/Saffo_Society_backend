@@ -24,6 +24,9 @@ class ShiftItem(BaseModel):
     startTime: str
     endTime: str
     status: str
+    latitude: float
+    longitude: float
+    radiusMeters: int
 
 
 class ShiftListData(BaseModel):

@@ -13,8 +13,12 @@ from modules.guard_common.deps import GuardUser
 from modules.guard_common.settings import DELIVERY_UPLOAD_DIR, MAX_DELIVERY_PHOTO_BYTES
 from modules.delivery.models import (
     IST,
+    RECEIVED_BY_GUARD,
+    RECEIVED_BY_RESIDENT,
     STATUS_APPROVED,
+    STATUS_COLLECTED,
     STATUS_EXITED,
+    STATUS_HELD,
     STATUS_INSIDE,
     STATUS_PENDING,
     STATUS_REJECTED,
@@ -347,6 +351,46 @@ def exit_delivery(
 
     delivery.status = STATUS_EXITED
     delivery.exit_time = now_ist()
+    db.commit()
+    db.refresh(delivery)
+    return _to_item(delivery)
+
+
+def hold_delivery(
+    db: Session,
+    current_user: GuardUser,
+    delivery_id: int,
+) -> DeliveryItem:
+    """Keep the parcel at the gate. Check-in and exit stay on the inside path."""
+    delivery = _get_for_society(db, current_user, delivery_id)
+    if delivery.status not in (STATUS_PENDING, STATUS_APPROVED):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Delivery can be held only while it is pending or approved",
+        )
+
+    delivery.status = STATUS_HELD
+    delivery.received_by = RECEIVED_BY_GUARD
+    db.commit()
+    db.refresh(delivery)
+    return _to_item(delivery)
+
+
+def collect_delivery(
+    db: Session,
+    current_user: GuardUser,
+    delivery_id: int,
+) -> DeliveryItem:
+    """Resident collects a parcel that is already held at the gate."""
+    delivery = _get_for_society(db, current_user, delivery_id)
+    if delivery.status != STATUS_HELD:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Delivery can be collected only while it is held at the gate",
+        )
+
+    delivery.status = STATUS_COLLECTED
+    delivery.received_by = RECEIVED_BY_RESIDENT
     db.commit()
     db.refresh(delivery)
     return _to_item(delivery)

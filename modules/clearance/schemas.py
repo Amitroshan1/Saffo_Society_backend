@@ -1,15 +1,10 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
 
 class ClearanceCreate(BaseModel):
     move_out_date: date | None = None
-
-
-class DocumentCreate(BaseModel):
-    doc_type: str
-    file_url: str
 
 
 class DocumentOut(BaseModel):
@@ -24,6 +19,7 @@ class ClearanceOut(BaseModel):
     dues_clear: bool
     gate_allowed: bool
     move_out_date: date | None
+    allowed_at: datetime | None = None
     documents: list[DocumentOut]
 
 

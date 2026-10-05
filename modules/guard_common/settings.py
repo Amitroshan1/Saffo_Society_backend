@@ -4,7 +4,8 @@ VISITOR_UPLOAD_DIR = os.getenv("VISITOR_UPLOAD_DIR", "uploads/visitor_photo")
 DELIVERY_UPLOAD_DIR = os.getenv("DELIVERY_UPLOAD_DIR", "uploads/delivery_boy_photo")
 CAB_UPLOAD_DIR = os.getenv("CAB_UPLOAD_DIR", "uploads/cab_driver_photo")
 DOCUMENT_UPLOAD_DIR = os.getenv("DOCUMENT_UPLOAD_DIR", "uploads/gate_documents")
-MOVE_OUT_UPLOAD_DIR = os.getenv("MOVE_OUT_UPLOAD_DIR", "uploads/move_out_documents")
+CLEARANCE_UPLOAD_DIR = os.getenv("CLEARANCE_UPLOAD_DIR", "uploads/clearance_documents")
+SOS_UPLOAD_DIR = os.getenv("SOS_UPLOAD_DIR", "uploads/sos_photos")
 GUARD_PHOTO_UPLOAD_DIR = os.getenv("GUARD_PHOTO_UPLOAD_DIR", "uploads/guard_photo")
 
 UPLOAD_DIRS = (
@@ -12,7 +13,8 @@ UPLOAD_DIRS = (
     DELIVERY_UPLOAD_DIR,
     CAB_UPLOAD_DIR,
     DOCUMENT_UPLOAD_DIR,
-    MOVE_OUT_UPLOAD_DIR,
+    CLEARANCE_UPLOAD_DIR,
+    SOS_UPLOAD_DIR,
     GUARD_PHOTO_UPLOAD_DIR,
 )
 
@@ -20,3 +22,5 @@ MAX_VISITOR_PHOTO_BYTES = 5 * 1024 * 1024
 MAX_DELIVERY_PHOTO_BYTES = 5 * 1024 * 1024
 MAX_CAB_PHOTO_BYTES = 5 * 1024 * 1024
 MAX_GUARD_PHOTO_BYTES = 5 * 1024 * 1024
+MAX_CLEARANCE_DOCUMENT_BYTES = 5 * 1024 * 1024
+MAX_SOS_PHOTO_BYTES = 5 * 1024 * 1024

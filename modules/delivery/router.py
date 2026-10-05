@@ -9,9 +9,11 @@ from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.delivery.service import (
     check_in_delivery,
+    collect_delivery,
     create_delivery,
     exit_delivery,
     get_delivery,
+    hold_delivery,
     list_deliveries,
 )
 
@@ -104,3 +106,23 @@ def mark_delivery_exit(
 ):
     item = exit_delivery(db, current_user, delivery_id)
     return success_response("Delivery exited", item.model_dump(mode="json"))
+
+
+@router.patch("/{delivery_id}/hold")
+def mark_delivery_held(
+    delivery_id: int,
+    db: Session = Depends(get_db),
+    current_user: GuardUser = Depends(require_guard),
+):
+    item = hold_delivery(db, current_user, delivery_id)
+    return success_response("Delivery moved to gate", item.model_dump(mode="json"))
+
+
+@router.patch("/{delivery_id}/collect")
+def mark_delivery_collected(
+    delivery_id: int,
+    db: Session = Depends(get_db),
+    current_user: GuardUser = Depends(require_guard),
+):
+    item = collect_delivery(db, current_user, delivery_id)
+    return success_response("Delivery collected", item.model_dump(mode="json"))

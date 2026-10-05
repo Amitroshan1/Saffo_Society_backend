@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -49,6 +49,21 @@ def update_vehicle(
     db: Session = Depends(get_db),
 ):
     return service.update_vehicle(db, ctx.user.id, ctx.society_id, vehicle_id, data)
+
+
+@router.delete("/vehicles/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_vehicle(
+    vehicle_id: int,
+    ctx: AuthContext = Depends(require_resident),
+    db: Session = Depends(get_db),
+):
+    service.delete_vehicle(db, ctx.user.id, ctx.society_id, vehicle_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/visitor-parking/slots", response_model=list[SlotOut])
+def free_visitor_slots(ctx: AuthContext = Depends(require_resident), db: Session = Depends(get_db)):
+    return service.list_free_visitor_slots(db, ctx.user.id, ctx.society_id)
 
 
 @router.post("/visitor-parking", response_model=VisitorParkingOut, status_code=201)

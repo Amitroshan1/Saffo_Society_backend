@@ -21,10 +21,11 @@ from modules.guard_profile.router import router as guard_profile_router
 from modules.staff.router import router as staff_router
 from modules.schedule.router import router as schedule_router
 from modules.parking.router import router as parking_router
-from modules.move_out.router import router as move_out_router
+from modules.guard_move_out.router import router as move_out_router
 from modules.document.router import router as document_router
 from modules.delivery.router import router as delivery_router
 from modules.cab.router import router as cab_router
+from modules.guard_common.router import router as guard_common_router
 
 app = FastAPI(title="Saffo Society API")
 
@@ -49,7 +50,7 @@ app.include_router(notification_router)
 for guard_router in (
     guard_visitor_router, guard_sos_router, guard_booking_router, guard_dashboard_router,
     guard_profile_router, staff_router, schedule_router, parking_router,
-    move_out_router, document_router, delivery_router, cab_router,
+    move_out_router, document_router, delivery_router, cab_router, guard_common_router,
 ):
     app.include_router(guard_router)
 for folder in UPLOAD_DIRS:

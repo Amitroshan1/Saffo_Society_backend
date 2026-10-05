@@ -1,12 +1,6 @@
 from pydantic import BaseModel
 
 
-class SosCreate(BaseModel):
-    title: str
-    description: str
-    photo_url: str | None = None
-
-
 class SosOut(BaseModel):
     id: int
     title: str

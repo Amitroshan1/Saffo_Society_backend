@@ -15,6 +15,7 @@ class SosItem(BaseModel):
     flatNo: str
     title: str
     message: str
+    photoUrl: Optional[str] = None
     priority: str
     status: str
     createdAt: datetime

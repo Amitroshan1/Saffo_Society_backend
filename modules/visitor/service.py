@@ -3,6 +3,7 @@ import random
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from modules.guard_visitor.models import VISIT_APPROVED, VISIT_SCHEDULED
 from modules.resident.service import _occupancy_or_404
 from modules.visitor import crud
 from modules.visitor.models import Visit
@@ -33,12 +34,11 @@ def invite(db: Session, user_id: int, society_id: int | None, data: InvitationIn
     visitor = crud.get_or_create_visitor(
         db, occupancy.society_id, data.name.strip(), data.phone.strip()
     )
-    status = "waiting" if data.expected_now else "scheduled"
     visit = Visit(
         society_id=occupancy.society_id,
         occupancy_id=occupancy.id,
         visitor_id=visitor.id,
-        status=status,
+        status=VISIT_SCHEDULED,
         visitor_type=data.visitor_type,
         purpose=data.purpose,
         is_preapproved=True,
@@ -59,7 +59,7 @@ def approve(db: Session, user_id: int, society_id: int | None, data: ApprovalIn)
 
     action = data.action.strip().lower()
     if action == "approve":
-        visit.status = "waiting"
+        visit.status = VISIT_APPROVED
         visit.is_preapproved = True
     elif action == "reject":
         visit.status = "rejected"
