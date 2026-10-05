@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import DOCUMENTS_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.document.service import get_document, list_documents, open_document
@@ -19,7 +20,7 @@ def fetch_documents(
     sortBy: str = Query("publishedAt"),
     sortOrder: str | None = Query("desc"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DOCUMENTS_VIEW)),
 ):
     data = list_documents(
         db,
@@ -38,7 +39,7 @@ def fetch_documents(
 def fetch_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DOCUMENTS_VIEW)),
 ):
     item = get_document(db, current_user, document_id)
     return success_response("Document fetched", item.model_dump(mode="json"))
@@ -48,7 +49,7 @@ def fetch_document(
 def view_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DOCUMENTS_VIEW)),
 ) -> FileResponse:
     return open_document(db, current_user, document_id, inline=True)
 
@@ -57,6 +58,6 @@ def view_document(
 def download_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DOCUMENTS_VIEW)),
 ) -> FileResponse:
     return open_document(db, current_user, document_id, inline=False)

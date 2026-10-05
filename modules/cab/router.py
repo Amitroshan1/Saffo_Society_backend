@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import CABS_CREATE, CABS_UPDATE, CABS_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.cab.service import (
@@ -28,7 +29,7 @@ def add_cab(
     driverName: str | None = Form(None),
     photo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(CABS_CREATE)),
 ):
     item = create_cab(
         db,
@@ -56,7 +57,7 @@ def fetch_cabs(
     dateFrom: date | None = Query(None, alias="from"),
     dateTo: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(CABS_VIEW)),
 ):
     data = list_cabs(
         db,
@@ -77,7 +78,7 @@ def fetch_cabs(
 def fetch_cab(
     cab_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(CABS_VIEW)),
 ):
     item = get_cab(db, current_user, cab_id)
     return success_response("Cab fetched", item.model_dump(mode="json"))
@@ -87,7 +88,7 @@ def fetch_cab(
 def mark_cab_check_in(
     cab_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(CABS_UPDATE)),
 ):
     item = check_in_cab(db, current_user, cab_id)
     return success_response("Cab checked in", item.model_dump(mode="json"))
@@ -97,7 +98,7 @@ def mark_cab_check_in(
 def mark_cab_exit(
     cab_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(CABS_UPDATE)),
 ):
     item = exit_cab(db, current_user, cab_id)
     return success_response("Cab exited", item.model_dump(mode="json"))

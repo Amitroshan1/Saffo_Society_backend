@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from modules.guard_booking.service import get_booking, list_bookings
+from core.permissions import GATE_BOOKINGS_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 
@@ -21,7 +22,7 @@ def fetch_bookings(
     sortBy: str = Query("bookingDate"),
     sortOrder: str | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_BOOKINGS_VIEW)),
 ):
     data = list_bookings(
         db,
@@ -41,7 +42,7 @@ def fetch_bookings(
 def fetch_booking(
     booking_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_BOOKINGS_VIEW)),
 ):
     item = get_booking(db, current_user, booking_id)
     return success_response("Booking fetched", item.model_dump(mode="json"))

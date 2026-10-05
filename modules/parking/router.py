@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import GATE_PARKING_UPDATE, GATE_PARKING_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.parking.schemas import VisitorEntryRequest
@@ -28,7 +29,7 @@ def fetch_resident_parking(
     sortBy: str = Query("building"),
     sortOrder: str | None = Query("asc"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_PARKING_VIEW)),
 ):
     data = list_resident_parking(
         db,
@@ -54,7 +55,7 @@ def fetch_visitor_parking(
     sortBy: str = Query("slotNumber"),
     sortOrder: str | None = Query("asc"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_PARKING_VIEW)),
 ):
     data = list_visitor_parking(
         db,
@@ -79,7 +80,7 @@ def fetch_parking_logs(
     sortBy: str = Query("entryTime"),
     sortOrder: str | None = Query("desc"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_PARKING_VIEW)),
 ):
     data = list_parking_logs(
         db,
@@ -98,7 +99,7 @@ def fetch_parking_logs(
 def resident_entry(
     parking_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_PARKING_UPDATE)),
 ):
     item = enter_resident(db, current_user, parking_id)
     return success_response("Resident vehicle entered", item.model_dump(mode="json"))
@@ -108,7 +109,7 @@ def resident_entry(
 def resident_exit(
     parking_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_PARKING_UPDATE)),
 ):
     item = exit_resident(db, current_user, parking_id)
     return success_response("Resident vehicle exited", item.model_dump(mode="json"))
@@ -118,7 +119,7 @@ def resident_exit(
 def visitor_entry(
     payload: VisitorEntryRequest,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_PARKING_UPDATE)),
 ):
     item = enter_visitor(db, current_user, payload)
     return success_response("Visitor vehicle entered", item.model_dump(mode="json"))
@@ -128,7 +129,7 @@ def visitor_entry(
 def visitor_exit(
     log_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_PARKING_UPDATE)),
 ):
     item = exit_visitor(db, current_user, log_id)
     return success_response("Visitor vehicle exited", item.model_dump(mode="json"))

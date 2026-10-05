@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_db
+from core.permissions import GATE_SOS_UPDATE, GATE_SOS_VIEW
 from modules.guard_common.deps import GuardUser, guard_from_token, require_guard
 from modules.guard_common.responses import success_response
 from modules.guard_sos.manager import broadcast_sos_resolved, manager
@@ -23,7 +24,7 @@ def fetch_sos_alerts(
     dateFrom: date | None = Query(None, alias="from"),
     dateTo: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_SOS_VIEW)),
 ):
     data = list_sos_alerts(
         db,
@@ -44,7 +45,7 @@ def fetch_sos_alerts(
 def fetch_sos_alert(
     sos_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_SOS_VIEW)),
 ):
     item = get_sos_alert(db, current_user, sos_id)
     return success_response("SOS alert fetched", item.model_dump(mode="json"))
@@ -54,7 +55,7 @@ def fetch_sos_alert(
 async def mark_sos_resolved(
     sos_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_SOS_UPDATE)),
 ):
     item = resolve_sos_alert(db, current_user, sos_id)
     payload = item.model_dump(mode="json")

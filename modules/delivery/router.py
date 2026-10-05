@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import DELIVERIES_CREATE, DELIVERIES_UPDATE, DELIVERIES_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.delivery.service import (
@@ -29,7 +30,7 @@ def add_delivery(
     parcelNote: str | None = Form(None),
     photo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DELIVERIES_CREATE)),
 ):
     item = create_delivery(
         db,
@@ -58,7 +59,7 @@ def fetch_deliveries(
     dateFrom: date | None = Query(None, alias="from"),
     dateTo: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DELIVERIES_VIEW)),
 ):
     data = list_deliveries(
         db,
@@ -79,7 +80,7 @@ def fetch_deliveries(
 def fetch_delivery(
     delivery_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DELIVERIES_VIEW)),
 ):
     item = get_delivery(db, current_user, delivery_id)
     return success_response("Delivery fetched", item.model_dump(mode="json"))
@@ -89,7 +90,7 @@ def fetch_delivery(
 def mark_delivery_check_in(
     delivery_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DELIVERIES_UPDATE)),
 ):
     item = check_in_delivery(db, current_user, delivery_id)
     return success_response("Delivery checked in", item.model_dump(mode="json"))
@@ -99,7 +100,7 @@ def mark_delivery_check_in(
 def mark_delivery_exit(
     delivery_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(DELIVERIES_UPDATE)),
 ):
     item = exit_delivery(db, current_user, delivery_id)
     return success_response("Delivery exited", item.model_dump(mode="json"))

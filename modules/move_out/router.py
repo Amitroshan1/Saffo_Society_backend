@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import MOVE_OUT_UPDATE, MOVE_OUT_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.move_out.service import allow_move_out, get_move_out, list_move_outs, open_move_out_file
@@ -19,7 +20,7 @@ def fetch_move_outs(
     sortBy: str = Query("moveOutDate"),
     sortOrder: str | None = Query("desc"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(MOVE_OUT_VIEW)),
 ):
     data = list_move_outs(
         db,
@@ -38,7 +39,7 @@ def fetch_move_outs(
 def fetch_move_out(
     move_out_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(MOVE_OUT_VIEW)),
 ):
     item = get_move_out(db, current_user, move_out_id)
     return success_response("Move-out fetched", item.model_dump(mode="json"))
@@ -49,7 +50,7 @@ def view_move_out_file(
     move_out_id: int,
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(MOVE_OUT_VIEW)),
 ) -> FileResponse:
     return open_move_out_file(db, current_user, move_out_id, file_id)
 
@@ -58,7 +59,7 @@ def view_move_out_file(
 def mark_move_out_allowed(
     move_out_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(MOVE_OUT_UPDATE)),
 ):
     item = allow_move_out(db, current_user, move_out_id)
     return success_response("Move-out allowed", item.model_dump(mode="json"))

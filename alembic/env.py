@@ -6,11 +6,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import settings
 from app.database import Base
 from modules.society.models import Society  # noqa: F401
-from auth.models import User, Role, Permission, RolePermission, Membership  # noqa: F401
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
+from auth.models import User, Role, Permission, RolePermission, Membership, RevokedToken  # noqa: F401
 
 from modules.resident.models import (  # noqa: F401
     Building,

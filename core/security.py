@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta, timezone
-
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-
 from app.config import settings
+import uuid
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -30,16 +30,6 @@ def create_access_token(user_id: int, society_id: int | None) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(user_id: int) -> str:
-    payload = {
-        "sub": str(user_id),
-        "type": TOKEN_TYPE_REFRESH,
-        "exp": datetime.now(timezone.utc)
-        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-    }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-
-
 def decode_access_token(token: str) -> dict:
     payload = jwt.decode(
         token,
@@ -60,3 +50,14 @@ def decode_refresh_token(token: str) -> dict:
     if payload.get("type") != TOKEN_TYPE_REFRESH:
         raise JWTError("Not a refresh token")
     return payload
+
+def create_refresh_token(user_id: int, society_id: int | None) -> str:
+    payload = {
+        "sub": str(user_id),
+        "sid": society_id,
+        "type": TOKEN_TYPE_REFRESH,
+        "jti": str(uuid.uuid4()),
+        "exp": datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

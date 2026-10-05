@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import SCHEDULE_UPDATE, SCHEDULE_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.schedule.schemas import PunchRequest
@@ -28,7 +29,7 @@ def fetch_shifts(
     dateFrom: date | None = Query(None, alias="from"),
     dateTo: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(SCHEDULE_VIEW)),
 ):
     data = list_shifts(
         db,
@@ -54,7 +55,7 @@ def fetch_attendance(
     dateFrom: date | None = Query(None, alias="from"),
     dateTo: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(SCHEDULE_VIEW)),
 ):
     data = list_attendance(
         db,
@@ -79,7 +80,7 @@ def fetch_punches(
     dateFrom: date | None = Query(None, alias="from"),
     dateTo: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(SCHEDULE_VIEW)),
 ):
     data = list_punches(
         db,
@@ -98,7 +99,7 @@ def fetch_punches(
 def mark_punch_in(
     body: PunchRequest,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(SCHEDULE_UPDATE)),
 ):
     item = punch_in_shift(db, current_user, body.shiftId, body.latitude, body.longitude)
     return success_response("Punched in", item.model_dump(mode="json"))
@@ -108,7 +109,7 @@ def mark_punch_in(
 def mark_punch_out(
     body: PunchRequest,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(SCHEDULE_UPDATE)),
 ):
     item = punch_out_shift(db, current_user, body.shiftId, body.latitude, body.longitude)
     return success_response("Punched out", item.model_dump(mode="json"))

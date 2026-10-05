@@ -80,3 +80,16 @@ class Membership(Base):
 
     user = relationship("User", back_populates="memberships")
     role = relationship("Role")
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    jti = Column(String(64), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(ZoneInfo("Asia/Kolkata")),
+        nullable=False,
+    )

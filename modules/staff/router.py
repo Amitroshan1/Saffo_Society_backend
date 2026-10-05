@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import STAFF_UPDATE, STAFF_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.staff.service import enter_staff, exit_staff, list_staff
@@ -22,7 +23,7 @@ def fetch_staff(
     sortBy: str = Query("name"),
     sortOrder: str | None = Query("asc"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(STAFF_VIEW)),
 ):
     data = list_staff(
         db,
@@ -43,7 +44,7 @@ def fetch_staff(
 def staff_entry(
     staff_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(STAFF_UPDATE)),
 ):
     item = enter_staff(db, current_user, staff_id)
     return success_response("Staff checked in", item.model_dump(mode="json"))
@@ -53,7 +54,7 @@ def staff_entry(
 def staff_exit(
     staff_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(STAFF_UPDATE)),
 ):
     item = exit_staff(db, current_user, staff_id)
     return success_response("Staff checked out", item.model_dump(mode="json"))

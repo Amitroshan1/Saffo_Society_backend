@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import AuthContext, require_resident
+from app.dependencies import AuthContext, require_permission
+from core.permissions import VISITORS_CREATE, VISITORS_UPDATE, VISITORS_VIEW
 from modules.visitor import service
 from modules.visitor.schemas import ApprovalIn, InvitationIn, VisitOut
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/resident", tags=["Resident visitors"])
 def list_visitors(
     status: str | None = Query(None),
     search: str | None = Query(None),
-    ctx: AuthContext = Depends(require_resident),
+    ctx: AuthContext = Depends(require_permission(VISITORS_VIEW)),
     db: Session = Depends(get_db),
 ):
     return service.list_visitors(db, ctx.user.id, ctx.society_id, status, search)
@@ -22,7 +23,7 @@ def list_visitors(
 @router.post("/visitor-invitations", response_model=VisitOut, status_code=201)
 def invite(
     data: InvitationIn,
-    ctx: AuthContext = Depends(require_resident),
+    ctx: AuthContext = Depends(require_permission(VISITORS_CREATE)),
     db: Session = Depends(get_db),
 ):
     return service.invite(db, ctx.user.id, ctx.society_id, data)
@@ -31,7 +32,7 @@ def invite(
 @router.post("/visitor-approval", response_model=VisitOut)
 def approval(
     data: ApprovalIn,
-    ctx: AuthContext = Depends(require_resident),
+    ctx: AuthContext = Depends(require_permission(VISITORS_UPDATE)),
     db: Session = Depends(get_db),
 ):
     return service.approve(db, ctx.user.id, ctx.society_id, data)

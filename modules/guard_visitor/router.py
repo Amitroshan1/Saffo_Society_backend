@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from core.permissions import GATE_VISITORS_CREATE, GATE_VISITORS_UPDATE, GATE_VISITORS_VIEW
 from modules.guard_common.deps import GuardUser, require_guard
 from modules.guard_common.responses import success_response
 from modules.guard_visitor.service import (
@@ -34,7 +35,7 @@ def add_visitor(
     remarks: str | None = Form(None),
     photo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_VISITORS_CREATE)),
 ):
     item = create_visitor(
         db,
@@ -67,7 +68,7 @@ def fetch_visitors(
     dateFrom: date | None = Query(None, alias="from"),
     dateTo: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_VISITORS_VIEW)),
 ):
     data = list_visitors(
         db,
@@ -88,7 +89,7 @@ def fetch_visitors(
 def fetch_recent_visitors(
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_VISITORS_VIEW)),
 ):
     data = recent_visitors(db, current_user, limit=limit)
     return success_response("Recent walk-ins fetched", data.model_dump(mode="json"))
@@ -98,7 +99,7 @@ def fetch_recent_visitors(
 def fetch_visitor(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_VISITORS_VIEW)),
 ):
     item = get_visitor(db, current_user, visit_id)
     return success_response("Visitor fetched", item.model_dump(mode="json"))
@@ -108,7 +109,7 @@ def fetch_visitor(
 def mark_visitor_check_in(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_VISITORS_UPDATE)),
 ):
     item = check_in_visitor(db, current_user, visit_id)
     return success_response("Visitor checked in", item.model_dump(mode="json"))
@@ -118,7 +119,7 @@ def mark_visitor_check_in(
 def mark_visitor_exit(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: GuardUser = Depends(require_guard),
+    current_user: GuardUser = Depends(require_guard(GATE_VISITORS_UPDATE)),
 ):
     item = exit_visitor(db, current_user, visit_id)
     return success_response("Visitor exited", item.model_dump(mode="json"))

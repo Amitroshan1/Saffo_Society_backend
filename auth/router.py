@@ -20,6 +20,10 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     return service.login(db, data.email, data.password, data.society_id)
 
+@router.post("/logout")
+def logout(data: RefreshRequest, db: Session = Depends(get_db)):
+    return service.logout(db, data.refresh_token)
+
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh(data: RefreshRequest, db: Session = Depends(get_db)):

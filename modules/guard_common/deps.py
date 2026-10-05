@@ -18,22 +18,30 @@ class GuardUser:
 
 
 def _to_guard(ctx: AuthContext) -> GuardUser:
-    if ctx.role_name != GUARD_ROLE or ctx.society_id is None:
-        raise forbidden("Guard access only")
+    if ctx.society_id is None:
+        raise forbidden("No society selected")
     return GuardUser(
         id=ctx.user.id,
         society_id=ctx.society_id,
-        role=ctx.role_name,
+        role=ctx.role_name or "",
         email=ctx.user.email or "",
     )
 
 
-def require_guard(ctx: AuthContext = Depends(get_current_user)) -> GuardUser:
-    return _to_guard(ctx)
+def require_guard(permission: str):
+    def checker(ctx: AuthContext = Depends(get_current_user)) -> GuardUser:
+        user = _to_guard(ctx)
+        if permission not in ctx.permissions:
+            raise forbidden(f"Permission denied: {permission} required")
+        return user
+
+    return checker
 
 
 def guard_from_token(db: Session, token: str | None) -> GuardUser:
-    """WebSocket clients cannot send headers, so the token arrives as ?token=."""
     if not token:
         raise unauthorized()
-    return _to_guard(get_current_user(token=token, db=db))
+    ctx = get_current_user(token=token, db=db)
+    if "gate_sos:view" not in ctx.permissions:
+        raise forbidden("Permission denied: gate_sos:view required")
+    return _to_guard(ctx)

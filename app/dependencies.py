@@ -76,7 +76,12 @@ def require_permission(permission: str):
 
     return checker
 
-def require_resident(ctx: AuthContext = Depends(get_current_user)) -> AuthContext:
-    if ctx.role_name != "resident":
-        raise forbidden("Resident role required")
-    return ctx
+def require_resident(permission: str):
+    def checker(ctx: AuthContext = Depends(get_current_user)) -> AuthContext:
+        if ctx.role_name != "resident":
+            raise forbidden("Resident role required")
+        if permission not in ctx.permissions:
+            raise forbidden(f"Permission denied: {permission} required")
+        return ctx
+
+    return checker
